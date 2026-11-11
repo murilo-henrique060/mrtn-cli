@@ -1,118 +1,171 @@
-# mrtn 🎈
-
-> **mrtn** (*Minimal Runtime Test Node* ou *Meu Resultado Terminou Negado*)  
-> Utilitário CLI em Go para treino local da Maratona SBC de Programação (ICPC Brasil).
+# mrtn - *Minimal Runtime Test Node* 🎈
 
 ---
 
-## 🎯 Objetivo
+## Objetivo
 
-O **`mrtn`** foi pensado para agilizar o ciclo de treino dos competidores da Maratona de Programação da SBC. Em vez de testar manualmente caso a caso ou depender de submissões em juízes online com filas demoradas, o `mrtn`:
+O **`mrtn`** foi pensado para agilizar o ciclo de treino dos competidores da Maratona de Programação da SBC. Em vez de testar manualmente caso a caso ou depender de submissões em juízes online, o `mrtn`:
 
-1. Sincroniza automaticamente os casos de teste e respostas oficiais a partir de um repositório no GitHub.
+1. Sincroniza automaticamente os casos de teste e respostas oficiais a partir do repositório [`mrtn-oracle`](https://github.com/murilo-henrique060/mrtn-oracle) no GitHub.
 2. Compila e executa localmente o seu código contra as entradas e saídas esperadas.
 3. Exibe um relatório visual detalhado (Accepted, Wrong Answer, Time Limit Exceeded, Runtime Error).
 4. É multiplataforma: compatível tanto com **Linux** quanto com **Windows**.
 
 ---
 
-## 🚀 Comandos
+## Comandos
 
 O `mrtn` mantém uma interface minimalista e focada em produtividade:
 
 ### 1. Sincronizar casos de teste (`mrtn sync`)
 
-Baixa ou atualiza o repositório contendo as questões, casos de entrada (`.in`) e gabaritos esperados (`.sol` / `.out`):
+Baixa ou atualiza o repositório contendo as questões, casos de entrada e gabaritos esperados ([`mrtn-oracle`](https://github.com/murilo-henrique060/mrtn-oracle)):
 
 ```bash
 mrtn sync
 ```
 
-> **Nota:** Os casos de teste sincronizados ficam armazenados em cache local, permitindo treinar e rodar testes mesmo sem conexão com a internet.
+> **Nota:** Os casos de teste sincronizados são obtidos de [murilo-henrique060/mrtn-oracle](https://github.com/murilo-henrique060/mrtn-oracle) e ficam armazenados em cache local, permitindo treinar e rodar testes mesmo sem conexão com a internet.
 
 ---
 
-### 2. Executar testes (`mrtn test`)
+### 2. Consultar informações (`mrtn info`)
 
-Executa o seu código contra os casos de teste da questão especificada:
+Permite inspecionar as provas, questões e casos de teste disponíveis no cache local:
 
 ```bash
-mrtn test <questao> [numero-do-teste] <arquivo>
+mrtn info [prova] [questao] [numero-do-teste]
 ```
+
+O comando adapta as informações exibidas de acordo com os parâmetros fornecidos:
+
+* **Sem argumentos (`mrtn info`):**  
+  Lista todas as edições/provas sincronizadas no sistema (ex: `2026-1`, referente à 1ª fase de 2026).
+  ```bash
+  mrtn info
+  ```
+
+* **Informando a prova (`mrtn info <prova>`):**  
+  Lista todas as questões daquela edição com suas letras identificadoras e títulos oficiais (extraídos do `problem.yaml`).
+  ```bash
+  mrtn info 2026-1
+  ```
+
+* **Informando prova e questão (`mrtn info <prova> <questao>`):**  
+  Lista todos os casos de teste disponíveis para a questão (amostras e testes fechados), numerados sequencialmente a partir de `1`.
+  ```bash
+  mrtn info 2026-1 A
+  ```
+
+* **Informando prova, questão e número do teste (`mrtn info <prova> <questao> <numero-do-teste>`):**  
+  Exibe informações detalhadas sobre o caso de teste específico, incluindo o conteúdo de entrada (`input`), saída esperada (`output`) e metadados.  
+  > **Importante:** Apenas o número do teste (na ordem exibida pelo `mrtn info`, começando em `1`) é válido — por exemplo, use `1` ao invés de `sample001`.
+  ```bash
+  mrtn info 2026-1 A 1
+  ```
+
+---
+
+### 3. Executar testes (`mrtn test`)
+
+Executa o seu código contra os casos de teste da questão especificada, informando a prova e a letra da questão no formato `<prova>-<questao>` (*case-insensitive*, ex: `2026-1-a` ou `2026-1-A`):
+
+```bash
+mrtn test <prova>-<questao> [numero-do-teste] <arquivo>
+```
+
+> **Nota sobre `[numero-do-teste]`:** Assim como no `mrtn info`, apenas o índice numérico do teste (começando em `1`, seguindo a ordem listada no `info`) é aceito pelo programa (ex: use `1` ao invés de `sample001`).
 
 #### Exemplos de uso:
 
-* **Testar todos os casos da questão `A`:**
+* **Testar todos os casos da questão `A` da prova `2026-1`:**
   ```bash
-  mrtn test A solucao.cpp
+  mrtn test 2026-1-A solucao.cpp
   ```
 
-* **Testar apenas um caso de teste específico (ex: caso `3` da questão `B`):**
+* **Testar apenas um caso de teste específico (ex: caso `3` da questão `B` de `2026-1`, aceitando minúsculas):**
   ```bash
-  mrtn test B 3 solucao.py
+  mrtn test 2026-1-b 3 solucao.py
   ```
 
-* **Testar solução em Go para a questão `M`:**
+* **Testar solução em Python para a questão `M` de `2026-1`:**
   ```bash
-  mrtn test M main.go
+  mrtn test 2026-1-m solucao.py
   ```
 
 ---
 
-## 🛠️ Suporte a Linguagens
+## Suporte a Linguagens
 
-O runner do `mrtn` detecta automaticamente a linguagem pelo formato do arquivo e aplica as flags recomendadas para maratona:
+As linguagens oficiais da Maratona de Programação SBC são **C, C++, Java, Kotlin e Python**.
 
-| Linguagem | Extensão | Compilador / Interpretador |
-| :--- | :--- | :--- |
-| **C++** | `.cpp`, `.cc` | `g++ -O2 -std=c++17` |
-| **C** | `.c` | `gcc -O2 -std=c11` |
-| **Python** | `.py` | `python3` / `pypy3` |
-| **Java** | `.java` | `javac` & `java` |
-| **Go** | `.go` | `go run` / `go build` |
+* **Versão atual:** Foco inicial e suporte para **Python (`.py`)**.
+* **Próximas versões:** Suporte aos compiladores e runners de **C (`.c`)**, **C++ (`.cpp`)**, **Java (`.java`)** e **Kotlin (`.kt`)**.
+
+| Linguagem | Extensão | Status Atual | Compilador / Interpretador |
+| :--- | :--- | :--- | :--- |
+| **Python** | `.py` | ✅ Suportado | `python3` / `pypy3` / `python` |
+| **C** | `.c` | ⏳ Em breve | `gcc -O2 -std=c11` |
+| **C++** | `.cpp`, `.cc` | ⏳ Em breve | `g++ -O2 -std=c++17` |
+| **Java** | `.java` | ⏳ Em breve | `javac` & `java` |
+| **Kotlin** | `.kt` | ⏳ Em breve | `kotlinc` & `kotlin` |
 
 ---
 
-## 📦 Instalação e Requisitos
+## Instalação e Requisitos
 
 ### Pré-requisitos
-* [Git](https://git-scm.com/) instalado no sistema (para clonagem/sincronização dos casos de teste).
-* [Go](https://go.dev/) (versão 1.21 ou superior) para compilação do binário.
-* Compiladores e interpretadores das linguagens que você pretende utilizar (ex: `g++`, `python3`).
+* [Go](https://go.dev/) (versão 1.21 ou superior).
+* [Git](https://git-scm.com/) instalado no sistema (para clonagem/sincronização dos casos de teste com o `mrtn sync`).
+* Compiladores e interpretadores das linguagens que você pretende utilizar (ex: `python3`, `g++`).
 
-### Compilando a partir do código-fonte
+### 1. Via `go install` (Recomendado)
+
+A forma mais simples e direta de instalar o `mrtn`:
+
+```bash
+go install github.com/murilo-henrique060/mrtn-cli/cmd/mrtn@latest
+```
+
+> **Nota:** Certifique-se de que o diretório de binários do Go (`$GOPATH/bin` ou `~/go/bin`) esteja no seu `PATH` para executar o comando `mrtn` diretamente no terminal:
+> - **Linux/macOS:** `export PATH=$PATH:$(go env GOPATH)/bin` (adicione ao seu `~/.bashrc` ou `~/.zshrc`)
+> - **Windows:** Verifique se `%USERPROFILE%\go\bin` está presente na variável de ambiente `PATH`.
+
+---
+
+### 2. Compilando a partir do código-fonte
+
+Para desenvolvimento ou compilação manual:
 
 ```bash
 # Clone o repositório
-git clone https://github.com/<seu-usuario>/mrtn.git
-cd mrtn
+git clone https://github.com/murilo-henrique060/mrtn-cli.git
+cd mrtn-cli
 
-# Compile o binário
-go build -o mrtn .
+# Instale o binário diretamente no seu GOPATH/bin
+go install ./cmd/mrtn
 
-# (Opcional) Mova para o PATH do seu sistema
-# No Linux:
-sudo mv mrtn /usr/local/bin/
-
-# No Windows:
-# Adicione a pasta do executável mrtn.exe às Variáveis de Ambiente do Sistema (PATH)
+# Ou apenas compile o executável no diretório atual
+go build -o mrtn ./cmd/mrtn
 ```
 
 ---
 
-## 🗺️ Roadmap de Desenvolvimento
+## Roadmap de Desenvolvimento
 
 - [x] Definição do escopo e comandos principais
 - [ ] Inicialização do módulo Go (`go mod init`)
-- [ ] Estrutura base da CLI (Cobra ou flags nativas)
-- [ ] Implementação de `mrtn sync` (integração Git / GitHub)
-- [ ] Implementação do runner e compilação das linguagens suportadas
+- [ ] Estrutura base da CLI (`mrtn sync`, `mrtn info` e `mrtn test`)
+- [ ] Implementação de `mrtn sync` (integração Git / GitHub com `mrtn-oracle`)
+- [ ] Implementação de `mrtn info` (inspeção de provas, questões e testes)
+- [ ] Implementação do runner para Python (`.py`)
 - [ ] Comparador de saídas com diff formatado e normalização de quebras de linha
 - [ ] Implementação de timeouts (TLE) e tratamento de erros de runtime (RTE)
 - [ ] Suporte multiplataforma testado em Linux e Windows
+- [ ] Adição futura dos runners para C, C++, Java e Kotlin
 
 ---
 
-## 📄 Licença
+## Licença
 
 Distribuído sob a licença MIT. Consulte `LICENSE` para mais informações.
