@@ -1,0 +1,33 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+mrtn
+
+# Test and coverage artifacts
+*.test
+*.out
+coverage.txt
+
+# Go workspace
+go.work
+
+# Dependency directories
+vendor/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local test data / cache (if stored in project for development)
+.mrtn_cache/
