@@ -154,7 +154,7 @@ go build -o mrtn ./cmd/mrtn
 ## Roadmap de Desenvolvimento
 
 - [x] Definição do escopo e comandos principais
-- [ ] Inicialização do módulo Go (`go mod init`)
+- [x] Inicialização do módulo Go (`go mod init`)
 - [ ] Estrutura base da CLI (`mrtn sync`, `mrtn info` e `mrtn test`)
 - [ ] Implementação de `mrtn sync` (integração Git / GitHub com `mrtn-oracle`)
 - [ ] Implementação de `mrtn info` (inspeção de provas, questões e testes)
