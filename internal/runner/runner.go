@@ -88,13 +88,13 @@ type preparedProgram struct {
 }
 
 // ResolvePythonInterpreter locates a working Python interpreter in PATH
-// following the README priority: python3, pypy3, python.
+// prioritizing pypy3, then python3, then python.
 func ResolvePythonInterpreter(lookPath func(string) (string, error)) (string, error) {
 	if lookPath == nil {
 		lookPath = exec.LookPath
 	}
 
-	candidates := []string{"python3", "pypy3", "python"}
+	candidates := []string{"pypy3", "python3", "python"}
 	for _, candidate := range candidates {
 		path, err := lookPath(candidate)
 		if err != nil {
@@ -109,7 +109,7 @@ func ResolvePythonInterpreter(lookPath func(string) (string, error)) (string, er
 		}
 	}
 
-	return "", errors.New("nenhum interpretador Python encontrado no PATH (tentado: python3, pypy3, python)")
+	return "", errors.New("nenhum interpretador Python encontrado no PATH (tentado: pypy3, python3, python)")
 }
 
 // ExecuteTests validates oracle files, prepares/compiles the solution if needed, and runs the requested tests.
@@ -194,27 +194,70 @@ func prepareProgram(
 
 	switch cfg.Language {
 	case LangPython:
-		interpreter, err := ResolvePythonInterpreter(lookPath)
-		if err != nil {
-			return preparedProgram{}, err
-		}
-		return preparedProgram{
-			runtimeName: filepath.Base(interpreter),
-			buildCmd: func(caseCtx context.Context) *exec.Cmd {
-				return exec.CommandContext(caseCtx, interpreter, cfg.FilePath)
-			},
-			cleanup: func() {},
-		}, nil
+		return preparePythonProgram(ctx, cfg, compileLimitSec, lookPath, hooks)
 
 	case LangC:
-		return compileNativeProgram(ctx, cfg, compileLimitSec, lookPath, hooks, "gcc", []string{"-O2", "-std=c11"}, []string{"-lm"})
+		return compileNativeProgram(ctx, cfg, compileLimitSec, lookPath, hooks, "gcc", []string{"-std=gnu11", "-O2"}, nativeTrailingFlags())
 
 	case LangCPP:
-		return compileNativeProgram(ctx, cfg, compileLimitSec, lookPath, hooks, "g++", []string{"-O2", "-std=c++17"}, nil)
+		return compileNativeProgram(ctx, cfg, compileLimitSec, lookPath, hooks, "g++", []string{"-std=c++20", "-O2"}, nativeTrailingFlags())
 
 	default:
 		return preparedProgram{}, fmt.Errorf("linguagem não suportada pelo runner: %s", cfg.Language)
 	}
+}
+
+func nativeTrailingFlags() []string {
+	if runtime.GOOS == "darwin" {
+		return []string{"-lm"}
+	}
+	return []string{"-lm", "-static"}
+}
+
+func preparePythonProgram(
+	ctx context.Context,
+	cfg RunConfig,
+	compileLimitSec int,
+	lookPath func(string) (string, error),
+	hooks RunHooks,
+) (preparedProgram, error) {
+	interpreter, err := ResolvePythonInterpreter(lookPath)
+	if err != nil {
+		return preparedProgram{}, err
+	}
+	runtimeName := filepath.Base(interpreter)
+
+	// Copy the script into an isolated temporary directory so `py_compile` never leaves `__pycache__` in the workspace.
+	buildDir, err := os.MkdirTemp("", "mrtn-py-*")
+	if err != nil {
+		return preparedProgram{}, fmt.Errorf("não foi possível criar diretório temporário de compilação: %w", err)
+	}
+	defer os.RemoveAll(buildDir)
+
+	baseName := filepath.Base(cfg.FilePath)
+	srcBytes, err := os.ReadFile(cfg.FilePath)
+	if err != nil {
+		return preparedProgram{}, fmt.Errorf("não foi possível ler o arquivo %q: %w", cfg.FilePath, err)
+	}
+	if err := os.WriteFile(filepath.Join(buildDir, baseName), srcBytes, 0o600); err != nil {
+		return preparedProgram{}, fmt.Errorf("não foi possível preparar cópia temporária de %q: %w", cfg.FilePath, err)
+	}
+
+	if hooks.OnCompileStart != nil {
+		hooks.OnCompileStart(cfg.FilePath, LangPython, runtimeName)
+	}
+
+	if err := runCompileCommand(ctx, LangPython, compileLimitSec, buildDir, interpreter, "-m", "py_compile", baseName); err != nil {
+		return preparedProgram{}, err
+	}
+
+	return preparedProgram{
+		runtimeName: runtimeName,
+		buildCmd: func(caseCtx context.Context) *exec.Cmd {
+			return exec.CommandContext(caseCtx, interpreter, "-B", cfg.FilePath)
+		},
+		cleanup: func() {},
+	}, nil
 }
 
 func compileNativeProgram(
@@ -253,33 +296,14 @@ func compileNativeProgram(
 		hooks.OnCompileStart(cfg.FilePath, cfg.Language, compilerName)
 	}
 
-	compileTimeout := DefaultCompileLimit
-	if compileLimitSec > 0 {
-		compileTimeout = time.Duration(compileLimitSec) * time.Second
-	}
-	compileCtx, cancel := context.WithTimeout(ctx, compileTimeout)
-	defer cancel()
-
 	args := make([]string, 0, len(frontFlags)+len(trailingFlags)+3)
 	args = append(args, frontFlags...)
 	args = append(args, cfg.FilePath, "-o", binPath)
 	args = append(args, trailingFlags...)
 
-	var stderr bytes.Buffer
-	cmd := exec.CommandContext(compileCtx, compilerPath, args...)
-	cmd.Stderr = &stderr
-	cmd.WaitDelay = 500 * time.Millisecond
-
-	if err := cmd.Run(); err != nil {
+	if err := runCompileCommand(ctx, cfg.Language, compileLimitSec, "", compilerPath, args...); err != nil {
 		cleanup()
-		if errors.Is(compileCtx.Err(), context.DeadlineExceeded) {
-			return preparedProgram{}, fmt.Errorf("tempo limite de compilação excedido (%s)", compileTimeout)
-		}
-		errMsg := formatStderrSnippet(stderr.String())
-		if errMsg != "" {
-			return preparedProgram{}, fmt.Errorf("erro de compilação (%s):\n%s", cfg.Language, errMsg)
-		}
-		return preparedProgram{}, fmt.Errorf("erro de compilação (%s): %w", cfg.Language, err)
+		return preparedProgram{}, err
 	}
 
 	return preparedProgram{
@@ -289,6 +313,47 @@ func compileNativeProgram(
 		},
 		cleanup: cleanup,
 	}, nil
+}
+
+func runCompileCommand(
+	ctx context.Context,
+	lang Language,
+	compileLimitSec int,
+	dir string,
+	bin string,
+	args ...string,
+) error {
+	compileTimeout := DefaultCompileLimit
+	if compileLimitSec > 0 {
+		compileTimeout = time.Duration(compileLimitSec) * time.Second
+	}
+	compileCtx, cancel := context.WithTimeout(ctx, compileTimeout)
+	defer cancel()
+
+	var stdout, stderr bytes.Buffer
+	cmd := exec.CommandContext(compileCtx, bin, args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	cmd.WaitDelay = 500 * time.Millisecond
+
+	if err := cmd.Run(); err != nil {
+		if errors.Is(compileCtx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("tempo limite de compilação excedido (%s)", compileTimeout)
+		}
+		errMsg := formatStderrSnippet(stderr.String())
+		if errMsg == "" {
+			errMsg = formatStderrSnippet(stdout.String())
+		}
+		if errMsg != "" {
+			return fmt.Errorf("erro de compilação (%s):\n%s", lang, errMsg)
+		}
+		return fmt.Errorf("erro de compilação (%s): %w", lang, err)
+	}
+
+	return nil
 }
 
 func runSingleCase(

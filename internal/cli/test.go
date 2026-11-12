@@ -192,6 +192,6 @@ Descrição:
     <prova>             Identificador da prova (ex: 2026-1)
     <questao>           Identificador da questão, case-insensitive (ex: a ou A)
     [numero-do-teste]   Índice numérico do teste a partir de 1 (opcional)
-    <arquivo>           Caminho para o arquivo-fonte (.py, .c, .cpp, .cc)
+    <arquivo>           Caminho para o arquivo-fonte (.py, .c, .cpp, .cc, .cxx)
 `)
 }

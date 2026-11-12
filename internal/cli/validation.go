@@ -20,11 +20,14 @@ const (
 	LangCPP    = runner.LangCPP
 )
 
+const supportedExtensionsLabel = "Python (.py), C (.c), C++ (.cpp, .cc, .cxx)"
+
 var supportedLanguages = map[string]Language{
 	".py":  LangPython,
 	".c":   LangC,
 	".cpp": LangCPP,
 	".cc":  LangCPP,
+	".cxx": LangCPP,
 }
 
 var plannedLanguages = map[string]string{
@@ -114,12 +117,12 @@ func ValidateSourceFile(path string) (Language, error) {
 	}
 
 	if planned, ok := plannedLanguages[ext]; ok {
-		return "", fmt.Errorf("a linguagem %s (%s) ainda não tem suporte nesta versão; suportadas atualmente: Python (.py), C (.c), C++ (.cpp, .cc)", planned, ext)
+		return "", fmt.Errorf("a linguagem %s (%s) ainda não tem suporte nesta versão; suportadas atualmente: %s", planned, ext, supportedExtensionsLabel)
 	}
 
 	if ext == "" {
-		return "", fmt.Errorf("arquivo %q não possui extensão; linguagens suportadas atualmente: Python (.py), C (.c), C++ (.cpp, .cc)", trimmed)
+		return "", fmt.Errorf("arquivo %q não possui extensão; linguagens suportadas atualmente: %s", trimmed, supportedExtensionsLabel)
 	}
 
-	return "", fmt.Errorf("extensão de arquivo não suportada %q; linguagens suportadas atualmente: Python (.py), C (.c), C++ (.cpp, .cc)", ext)
+	return "", fmt.Errorf("extensão de arquivo não suportada %q; linguagens suportadas atualmente: %s", ext, supportedExtensionsLabel)
 }
