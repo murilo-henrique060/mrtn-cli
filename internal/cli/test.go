@@ -1,8 +1,15 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/murilo-henrique060/mrtn-cli/internal/oracle"
+	"github.com/murilo-henrique060/mrtn-cli/internal/runner"
 )
 
 // TestOptions holds validated parameters for the `mrtn test` command.
@@ -71,22 +78,106 @@ func runTest(args []string, stdout, _ io.Writer) error {
 		return &commandError{err: err, usage: printTestUsage}
 	}
 
-	scope := "todos os testes"
-	if opts.TestNumber > 0 {
-		scope = fmt.Sprintf("teste #%d", opts.TestNumber)
+	cfg := runner.RunConfig{
+		Contest:    opts.Contest,
+		Question:   opts.Question,
+		TestNumber: opts.TestNumber,
+		FilePath:   opts.FilePath,
+	}
+
+	detailed := opts.TestNumber > 0
+	hooks := runner.RunHooks{
+		OnStart: func(detail oracle.QuestionDetail, interpreter string, timeLimit time.Duration, total int) {
+			printRunHeader(stdout, detail, opts, interpreter, timeLimit, total)
+		},
+		OnCaseDone: func(res runner.CaseResult) {
+			printCaseResult(stdout, res, detailed)
+		},
+	}
+
+	report, err := runner.ExecutePythonTests(context.Background(), cfg, hooks)
+	if err != nil {
+		return err
+	}
+
+	printRunSummary(stdout, opts, report)
+	return nil
+}
+
+func printRunHeader(
+	w io.Writer,
+	detail oracle.QuestionDetail,
+	opts TestOptions,
+	interpreter string,
+	timeLimit time.Duration,
+	total int,
+) {
+	label := strings.ToUpper(detail.Question)
+	if detail.Meta.Title != "" {
+		fmt.Fprintf(w, "Executando: %s %s - %s\n", detail.Contest, label, detail.Meta.Title)
+	} else {
+		fmt.Fprintf(w, "Executando: %s %s\n", detail.Contest, label)
 	}
 
 	fmt.Fprintf(
-		stdout,
-		"[stub] mrtn test: prova=%s questao=%s alvo=%s arquivo=%s linguagem=%s (runner será implementado na próxima fase).\n",
-		opts.Contest,
-		opts.Question,
-		scope,
+		w,
+		"Arquivo: %s (%s via %s) | Limite de tempo: %s | Casos: %d\n",
 		opts.FilePath,
 		opts.Language,
+		filepath.Base(interpreter),
+		timeLimit,
+		total,
 	)
+	fmt.Fprintln(w, strings.Repeat("-", 60))
+}
 
-	return nil
+func printCaseResult(w io.Writer, res runner.CaseResult, detailed bool) {
+	badge := fmt.Sprintf("[%s]", res.Verdict)
+	dur := formatDuration(res.Duration)
+
+	switch res.Verdict {
+	case runner.VerdictAC:
+		fmt.Fprintf(w, "  %-6s #%-3d %-22s (%s - Aceito)\n", badge, res.Test.Index, res.Test.Name, dur)
+	case runner.VerdictWA:
+		fmt.Fprintf(w, "  %-6s #%-3d %-22s (%s - Resposta incorreta)\n", badge, res.Test.Index, res.Test.Name, dur)
+		if detailed && res.Diff != "" {
+			fmt.Fprintln(w, res.Diff)
+		}
+	case runner.VerdictTLE:
+		fmt.Fprintf(w, "  %-6s #%-3d %-22s (%s - Tempo limite excedido)\n", badge, res.Test.Index, res.Test.Name, dur)
+	case runner.VerdictRTE:
+		fmt.Fprintf(w, "  %-6s #%-3d %-22s (%s - Erro de execução, código=%d)\n", badge, res.Test.Index, res.Test.Name, dur, res.ExitCode)
+		if detailed && res.Stderr != "" {
+			for _, line := range strings.Split(res.Stderr, "\n") {
+				fmt.Fprintf(w, "  | %s\n", line)
+			}
+		}
+	}
+}
+
+func printRunSummary(w io.Writer, opts TestOptions, report runner.RunReport) {
+	fmt.Fprintln(w, strings.Repeat("-", 60))
+	fmt.Fprintf(
+		w,
+		"Resumo: %d/%d aceitos | AC: %d | WA: %d | TLE: %d | RTE: %d | Tempo total: %s\n",
+		report.Passed,
+		len(report.Results),
+		report.Counts[runner.VerdictAC],
+		report.Counts[runner.VerdictWA],
+		report.Counts[runner.VerdictTLE],
+		report.Counts[runner.VerdictRTE],
+		formatDuration(report.TotalTime),
+	)
+	if opts.TestNumber == 0 && report.Failed > 0 {
+		fmt.Fprintf(w, "Dica: execute 'mrtn test %s %s <numero> %s' para ver detalhes da falha de um teste específico.\n", opts.Contest, opts.Question, opts.FilePath)
+	}
+}
+
+func formatDuration(d time.Duration) string {
+	if d >= time.Second {
+		return fmt.Sprintf("%.2fs", d.Seconds())
+	}
+	return fmt.Sprintf("%dms", d.Milliseconds())
 }
 
 func printTestUsage(w io.Writer) {

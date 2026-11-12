@@ -49,6 +49,8 @@ func Execute(args []string, stdout, stderr io.Writer) int {
 		err = runInfo(rest, stdout, stderr)
 	case "test":
 		err = runTest(rest, stdout, stderr)
+	case "clear":
+		err = runClear(rest, stdout, stderr)
 	default:
 		if strings.HasPrefix(subcmd, "-") {
 			fmt.Fprintf(stderr, "erro: flag desconhecida %q\n\n", subcmd)
@@ -85,6 +87,8 @@ func runHelp(args []string, stdout, stderr io.Writer) int {
 		printInfoUsage(stdout)
 	case "test":
 		printTestUsage(stdout)
+	case "clear":
+		printClearUsage(stdout)
 	default:
 		fmt.Fprintf(stderr, "erro: comando desconhecido %q\n\n", args[0])
 		printRootUsage(stderr)
@@ -131,6 +135,7 @@ Comandos disponíveis:
   sync    Sincroniza o repositório de casos de teste (mrtn-oracle)
   info    Consulta provas, questões e casos de teste disponíveis
   test    Executa e valida sua solução contra os casos de teste
+  clear   Remove os dados locais das provas e questões sincronizadas
   help    Exibe ajuda sobre um comando específico
 
 Use "mrtn <comando> --help" para mais informações sobre cada comando.

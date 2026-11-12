@@ -95,6 +95,18 @@ mrtn test <prova> <questao> [numero-do-teste] <arquivo>
 
 ---
 
+### 4. Limpar dados locais (`mrtn clear`)
+
+Remove os dados das provas, questões e casos de teste sincronizados no diretório de dados do usuário:
+
+```bash
+mrtn clear
+```
+
+> **Nota:** Após a limpeza, você pode baixar os casos de teste novamente a qualquer momento executando `mrtn sync`.
+
+---
+
 ## Suporte a Linguagens
 
 As linguagens oficiais da Maratona de Programação SBC são **C, C++, Java, Kotlin e Python**.
@@ -155,12 +167,12 @@ go build -o mrtn ./cmd/mrtn
 
 - [x] Definição do escopo e comandos principais
 - [x] Inicialização do módulo Go (`go mod init`)
-- [x] Estrutura base da CLI (`mrtn sync`, `mrtn info` e `mrtn test`)
+- [x] Estrutura base da CLI (`mrtn sync`, `mrtn info`, `mrtn test` e `mrtn clear`)
 - [x] Implementação de `mrtn sync` (integração Git / GitHub com `mrtn-oracle`)
 - [x] Implementação de `mrtn info` (inspeção de provas, questões e testes)
-- [ ] Implementação do runner para Python (`.py`)
-- [ ] Comparador de saídas com diff formatado e normalização de quebras de linha
-- [ ] Implementação de timeouts (TLE) e tratamento de erros de runtime (RTE)
+- [x] Implementação do runner para Python (`.py`)
+- [x] Comparador de saídas com diff formatado e normalização de quebras de linha
+- [x] Implementação de timeouts (TLE) e tratamento de erros de runtime (RTE)
 - [ ] Suporte multiplataforma testado em Linux e Windows
 - [ ] Adição futura dos runners para C, C++, Java e Kotlin
 
