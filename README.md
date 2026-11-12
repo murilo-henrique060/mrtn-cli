@@ -157,7 +157,7 @@ go build -o mrtn ./cmd/mrtn
 - [x] Inicialização do módulo Go (`go mod init`)
 - [x] Estrutura base da CLI (`mrtn sync`, `mrtn info` e `mrtn test`)
 - [x] Implementação de `mrtn sync` (integração Git / GitHub com `mrtn-oracle`)
-- [ ] Implementação de `mrtn info` (inspeção de provas, questões e testes)
+- [x] Implementação de `mrtn info` (inspeção de provas, questões e testes)
 - [ ] Implementação do runner para Python (`.py`)
 - [ ] Comparador de saídas com diff formatado e normalização de quebras de linha
 - [ ] Implementação de timeouts (TLE) e tratamento de erros de runtime (RTE)
