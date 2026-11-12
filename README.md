@@ -126,13 +126,13 @@ As linguagens oficiais da Maratona de Programação SBC são **C, C++, Java, Kot
 ## Instalação e Requisitos
 
 ### Pré-requisitos
-* [Go](https://go.dev/) (versão 1.21 ou superior).
 * [Git](https://git-scm.com/) instalado no sistema (para clonagem/sincronização dos casos de teste com o `mrtn sync`).
-* Compiladores e interpretadores das linguagens que você pretende utilizar (ex: `python3`, `g++`).
+* Compiladores e interpretadores das linguagens que você pretende utilizar (ex: `pypy3` / `python3`, `gcc`, `g++`, `javac` / `java`, `kotlinc`).
+* [Go](https://go.dev/) (versão 1.21 ou superior) — necessário apenas para instalação via `go install` ou compilação manual.
 
 ### 1. Via `go install` (Recomendado)
 
-A forma mais simples e direta de instalar o `mrtn`:
+A forma mais simples e direta para quem já utiliza Go:
 
 ```bash
 go install github.com/murilo-henrique060/mrtn-cli/cmd/mrtn@latest
@@ -144,7 +144,68 @@ go install github.com/murilo-henrique060/mrtn-cli/cmd/mrtn@latest
 
 ---
 
-### 2. Compilando a partir do código-fonte
+### 2. Via binários pré-compilados (sem precisar do Go)
+
+Baixe o executável correspondente ao seu sistema operacional na página de [Releases](https://github.com/murilo-henrique060/mrtn-cli/releases/tag/v1.0.0):
+
+| Sistema | Arquitetura | Pacote (`v1.0.0`) |
+| :--- | :--- | :--- |
+| **Linux** | x86_64 (`amd64`) | `mrtn-v1.0.0-linux-amd64` |
+| **Linux** | ARM64 (`arm64`) | `mrtn-v1.0.0-linux-arm64` |
+| **Windows** | x86_64 (`amd64`) | `mrtn-v1.0.0-windows-amd64.exe` |
+| **Windows** | ARM64 (`arm64`) | `mrtn-v1.0.0-windows-arm64.exe` |
+| **macOS** | Intel (`amd64`) | `mrtn-v1.0.0-darwin-amd64` |
+| **macOS** | Apple Silicon (`arm64`) | `mrtn-v1.0.0-darwin-arm64` |
+
+#### Linux
+```bash
+# Baixe o binário (substitua amd64 por arm64 se necessário)
+curl -LO https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.0/mrtn-v1.0.0-linux-amd64
+
+# Dê permissão de execução e mova para o PATH
+chmod +x mrtn-v1.0.0-linux-amd64
+sudo mv mrtn-v1.0.0-linux-amd64 /usr/local/bin/mrtn
+
+# Verifique a instalação
+mrtn --version
+```
+
+#### macOS
+```bash
+# Baixe o binário (use darwin-arm64 para Apple Silicon ou darwin-amd64 para Intel)
+curl -LO https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.0/mrtn-v1.0.0-darwin-arm64
+
+# Dê permissão de execução e mova para o PATH
+chmod +x mrtn-v1.0.0-darwin-arm64
+sudo mv mrtn-v1.0.0-darwin-arm64 /usr/local/bin/mrtn
+
+# Verifique a instalação
+mrtn --version
+```
+
+#### Windows (PowerShell)
+```powershell
+# Crie uma pasta para o binário e baixe o executável (ou use windows-arm64.exe)
+New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\mrtn\bin" | Out-Null
+Invoke-WebRequest `
+  -Uri "https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.0/mrtn-v1.0.0-windows-amd64.exe" `
+  -OutFile "$env:LOCALAPPDATA\mrtn\bin\mrtn.exe"
+
+# Adicione ao PATH do usuário (reinicie o terminal depois)
+$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if ($userPath -notlike "*$env:LOCALAPPDATA\mrtn\bin*") {
+  [Environment]::SetEnvironmentVariable("Path", "$userPath;$env:LOCALAPPDATA\mrtn\bin", "User")
+}
+
+# Verifique a instalação (após reabrir o terminal)
+mrtn --version
+```
+
+> **Verificação de integridade (opcional):** Os hashes SHA-256 dos binários estão disponíveis em `checksums.txt` na release (`sha256sum -c checksums.txt --ignore-missing`).
+
+---
+
+### 3. Compilando a partir do código-fonte
 
 Para desenvolvimento ou compilação manual:
 
