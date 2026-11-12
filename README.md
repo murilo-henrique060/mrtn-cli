@@ -173,7 +173,7 @@ go build -o mrtn ./cmd/mrtn
 - [x] Implementação dos runners para Python (`.py`), C (`.c`) e C++ (`.cpp`, `.cc`, `.cxx`)
 - [x] Comparador de saídas com diff formatado e normalização de quebras de linha
 - [x] Implementação de timeouts (TLE) e tratamento de erros de runtime (RTE)
-- [ ] Suporte multiplataforma testado em Linux e Windows
+- [x] Suporte multiplataforma testado em Linux e Windows
 - [ ] Adição futura dos runners para Java e Kotlin
 
 ---
