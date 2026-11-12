@@ -25,7 +25,7 @@ Baixa ou atualiza o repositório contendo as questões, casos de entrada e gabar
 mrtn sync
 ```
 
-> **Nota:** Os casos de teste sincronizados são obtidos de [murilo-henrique060/mrtn-oracle](https://github.com/murilo-henrique060/mrtn-oracle) e ficam armazenados em cache local, permitindo treinar e rodar testes mesmo sem conexão com a internet.
+> **Nota:** Os casos de teste sincronizados são obtidos de [murilo-henrique060/mrtn-oracle](https://github.com/murilo-henrique060/mrtn-oracle) e salvos no diretório de dados do usuário (`~/.local/share/mrtn/oracle` no Linux, `%LocalAppData%\mrtn\oracle` no Windows e `~/Library/Application Support/mrtn/oracle` no macOS, podendo ser alterado via `MRTN_DATA_DIR`), permitindo treinar e rodar testes mesmo sem conexão com a internet.
 
 ---
 
@@ -68,10 +68,10 @@ O comando adapta as informações exibidas de acordo com os parâmetros fornecid
 
 ### 3. Executar testes (`mrtn test`)
 
-Executa o seu código contra os casos de teste da questão especificada, informando a prova e a letra da questão no formato `<prova>-<questao>` (*case-insensitive*, ex: `2026-1-a` ou `2026-1-A`):
+Executa o seu código contra os casos de teste da questão especificada, informando a prova e a questão (*case-insensitive*, ex: `2026-1 a` ou `2026-1 A`):
 
 ```bash
-mrtn test <prova>-<questao> [numero-do-teste] <arquivo>
+mrtn test <prova> <questao> [numero-do-teste] <arquivo>
 ```
 
 > **Nota sobre `[numero-do-teste]`:** Assim como no `mrtn info`, apenas o índice numérico do teste (começando em `1`, seguindo a ordem listada no `info`) é aceito pelo programa (ex: use `1` ao invés de `sample001`).
@@ -80,17 +80,17 @@ mrtn test <prova>-<questao> [numero-do-teste] <arquivo>
 
 * **Testar todos os casos da questão `A` da prova `2026-1`:**
   ```bash
-  mrtn test 2026-1-A solucao.cpp
+  mrtn test 2026-1 A solucao.cpp
   ```
 
 * **Testar apenas um caso de teste específico (ex: caso `3` da questão `B` de `2026-1`, aceitando minúsculas):**
   ```bash
-  mrtn test 2026-1-b 3 solucao.py
+  mrtn test 2026-1 b 3 solucao.py
   ```
 
 * **Testar solução em Python para a questão `M` de `2026-1`:**
   ```bash
-  mrtn test 2026-1-m solucao.py
+  mrtn test 2026-1 m solucao.py
   ```
 
 ---
@@ -155,8 +155,8 @@ go build -o mrtn ./cmd/mrtn
 
 - [x] Definição do escopo e comandos principais
 - [x] Inicialização do módulo Go (`go mod init`)
-- [ ] Estrutura base da CLI (`mrtn sync`, `mrtn info` e `mrtn test`)
-- [ ] Implementação de `mrtn sync` (integração Git / GitHub com `mrtn-oracle`)
+- [x] Estrutura base da CLI (`mrtn sync`, `mrtn info` e `mrtn test`)
+- [x] Implementação de `mrtn sync` (integração Git / GitHub com `mrtn-oracle`)
 - [ ] Implementação de `mrtn info` (inspeção de provas, questões e testes)
 - [ ] Implementação do runner para Python (`.py`)
 - [ ] Comparador de saídas com diff formatado e normalização de quebras de linha

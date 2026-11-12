@@ -6,7 +6,7 @@
 *.dylib
 bin/
 dist/
-mrtn
+/mrtn
 
 # Test and coverage artifacts
 *.test
