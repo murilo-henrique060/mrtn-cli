@@ -18,21 +18,20 @@ const (
 	LangPython = runner.LangPython
 	LangC      = runner.LangC
 	LangCPP    = runner.LangCPP
+	LangJava   = runner.LangJava
+	LangKotlin = runner.LangKotlin
 )
 
-const supportedExtensionsLabel = "Python (.py), C (.c), C++ (.cpp, .cc, .cxx)"
+const supportedExtensionsLabel = "Python (.py), C (.c), C++ (.cpp, .cc, .cxx), Java (.java), Kotlin (.kt)"
 
 var supportedLanguages = map[string]Language{
-	".py":  LangPython,
-	".c":   LangC,
-	".cpp": LangCPP,
-	".cc":  LangCPP,
-	".cxx": LangCPP,
-}
-
-var plannedLanguages = map[string]string{
-	".java": "Java",
-	".kt":   "Kotlin",
+	".py":   LangPython,
+	".c":    LangC,
+	".cpp":  LangCPP,
+	".cc":   LangCPP,
+	".cxx":  LangCPP,
+	".java": LangJava,
+	".kt":   LangKotlin,
 }
 
 // ParseContest normalizes and validates a contest identifier (e.g., "2026-1", "2026-regional").
@@ -114,10 +113,6 @@ func ValidateSourceFile(path string) (Language, error) {
 	ext := strings.ToLower(filepath.Ext(trimmed))
 	if lang, ok := supportedLanguages[ext]; ok {
 		return lang, nil
-	}
-
-	if planned, ok := plannedLanguages[ext]; ok {
-		return "", fmt.Errorf("a linguagem %s (%s) ainda não tem suporte nesta versão; suportadas atualmente: %s", planned, ext, supportedExtensionsLabel)
 	}
 
 	if ext == "" {

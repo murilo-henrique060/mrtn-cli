@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -20,6 +21,10 @@ const (
 	DefaultTimeLimit = 5 * time.Second
 	// DefaultCompileLimit is used when problem.yaml does not specify limits.compilation_time.
 	DefaultCompileLimit = 60 * time.Second
+	// DefaultJavaMemMB is used when problem.yaml does not specify limits.memory.
+	DefaultJavaMemMB = 500
+	// DefaultJavaStackKB mirrors the judge's explicit stack limit for JVM threads.
+	DefaultJavaStackKB = 131072
 )
 
 // Language identifies a programming language supported by the runner.
@@ -29,7 +34,11 @@ const (
 	LangPython Language = "Python"
 	LangC      Language = "C"
 	LangCPP    Language = "C++"
+	LangJava   Language = "Java"
+	LangKotlin Language = "Kotlin"
 )
+
+var javaPublicTypeRe = regexp.MustCompile(`(?m)^[ \t]*public[ \t]+(?:[a-z]+[ \t]+)*(?:class|interface|enum|record)[ \t]+([A-Za-z_$][A-Za-z0-9_$]*)`)
 
 // Verdict represents the evaluation outcome of a single test case.
 type Verdict string
@@ -133,7 +142,7 @@ func ExecuteTests(ctx context.Context, cfg RunConfig, hooks RunHooks) (RunReport
 		selected = detail.Tests[cfg.TestNumber-1 : cfg.TestNumber]
 	}
 
-	program, err := prepareProgram(ctx, cfg, detail.Meta.Limits.CompilationTime, hooks)
+	program, err := prepareProgram(ctx, cfg, detail.Meta.Limits, hooks)
 	if err != nil {
 		return RunReport{}, err
 	}
@@ -184,7 +193,7 @@ func ExecuteTests(ctx context.Context, cfg RunConfig, hooks RunHooks) (RunReport
 func prepareProgram(
 	ctx context.Context,
 	cfg RunConfig,
-	compileLimitSec int,
+	limits oracle.ProblemLimits,
 	hooks RunHooks,
 ) (preparedProgram, error) {
 	lookPath := cfg.LookPath
@@ -194,13 +203,19 @@ func prepareProgram(
 
 	switch cfg.Language {
 	case LangPython:
-		return preparePythonProgram(ctx, cfg, compileLimitSec, lookPath, hooks)
+		return preparePythonProgram(ctx, cfg, limits.CompilationTime, lookPath, hooks)
 
 	case LangC:
-		return compileNativeProgram(ctx, cfg, compileLimitSec, lookPath, hooks, "gcc", []string{"-std=gnu11", "-O2"}, nativeTrailingFlags())
+		return compileNativeProgram(ctx, cfg, limits.CompilationTime, lookPath, hooks, "gcc", []string{"-std=gnu11", "-O2"}, nativeTrailingFlags())
 
 	case LangCPP:
-		return compileNativeProgram(ctx, cfg, compileLimitSec, lookPath, hooks, "g++", []string{"-std=c++20", "-O2"}, nativeTrailingFlags())
+		return compileNativeProgram(ctx, cfg, limits.CompilationTime, lookPath, hooks, "g++", []string{"-std=c++20", "-O2"}, nativeTrailingFlags())
+
+	case LangJava:
+		return prepareJavaProgram(ctx, cfg, limits, lookPath, hooks)
+
+	case LangKotlin:
+		return prepareKotlinProgram(ctx, cfg, limits, lookPath, hooks)
 
 	default:
 		return preparedProgram{}, fmt.Errorf("linguagem não suportada pelo runner: %s", cfg.Language)
@@ -235,19 +250,15 @@ func preparePythonProgram(
 	defer os.RemoveAll(buildDir)
 
 	baseName := filepath.Base(cfg.FilePath)
-	srcBytes, err := os.ReadFile(cfg.FilePath)
-	if err != nil {
-		return preparedProgram{}, fmt.Errorf("não foi possível ler o arquivo %q: %w", cfg.FilePath, err)
-	}
-	if err := os.WriteFile(filepath.Join(buildDir, baseName), srcBytes, 0o600); err != nil {
-		return preparedProgram{}, fmt.Errorf("não foi possível preparar cópia temporária de %q: %w", cfg.FilePath, err)
+	if _, err := copySourceToDir(cfg.FilePath, buildDir, baseName); err != nil {
+		return preparedProgram{}, err
 	}
 
 	if hooks.OnCompileStart != nil {
 		hooks.OnCompileStart(cfg.FilePath, LangPython, runtimeName)
 	}
 
-	if err := runCompileCommand(ctx, LangPython, compileLimitSec, buildDir, interpreter, "-m", "py_compile", baseName); err != nil {
+	if err := runCompileCommand(ctx, LangPython, compileLimitSec, buildDir, nil, interpreter, "-m", "py_compile", baseName); err != nil {
 		return preparedProgram{}, err
 	}
 
@@ -258,6 +269,186 @@ func preparePythonProgram(
 		},
 		cleanup: func() {},
 	}, nil
+}
+
+func prepareJavaProgram(
+	ctx context.Context,
+	cfg RunConfig,
+	limits oracle.ProblemLimits,
+	lookPath func(string) (string, error),
+	hooks RunHooks,
+) (preparedProgram, error) {
+	javacPath, err := lookPath("javac")
+	if err != nil {
+		return preparedProgram{}, errors.New("compilador Java (javac) não encontrado no PATH; instale um JDK para executar arquivos .java")
+	}
+	jarPath, err := lookPath("jar")
+	if err != nil {
+		return preparedProgram{}, errors.New("ferramenta Java (jar) não encontrada no PATH; instale um JDK para executar arquivos .java")
+	}
+	javaPath, err := lookPath("java")
+	if err != nil {
+		return preparedProgram{}, errors.New("runtime Java (java) não encontrado no PATH; instale um JDK/JRE para executar arquivos .java")
+	}
+
+	buildDir, err := os.MkdirTemp("", "mrtn-java-*")
+	if err != nil {
+		return preparedProgram{}, fmt.Errorf("não foi possível criar diretório temporário de compilação: %w", err)
+	}
+	cleanup := func() {
+		_ = os.RemoveAll(buildDir)
+	}
+
+	srcBytes, err := os.ReadFile(cfg.FilePath)
+	if err != nil {
+		cleanup()
+		return preparedProgram{}, fmt.Errorf("não foi possível ler o arquivo %q: %w", cfg.FilePath, err)
+	}
+
+	baseName := filepath.Base(cfg.FilePath)
+	mainClass := detectJavaPublicType(string(srcBytes))
+	targetFile := baseName
+	if mainClass != "" {
+		targetFile = mainClass + ".java"
+	} else {
+		mainClass = strings.TrimSuffix(baseName, filepath.Ext(baseName))
+		if mainClass == "" {
+			mainClass = "Main"
+		}
+	}
+
+	if err := os.WriteFile(filepath.Join(buildDir, targetFile), srcBytes, 0o600); err != nil {
+		cleanup()
+		return preparedProgram{}, fmt.Errorf("não foi possível preparar cópia temporária de %q: %w", cfg.FilePath, err)
+	}
+
+	if hooks.OnCompileStart != nil {
+		hooks.OnCompileStart(cfg.FilePath, LangJava, "javac")
+	}
+
+	javacEnv := []string{"_JAVA_OPTIONS=-Xmx700M -Xms64M"}
+	if err := runCompileCommand(ctx, LangJava, limits.CompilationTime, buildDir, javacEnv, javacPath, targetFile); err != nil {
+		cleanup()
+		return preparedProgram{}, err
+	}
+
+	entries, err := os.ReadDir(buildDir)
+	if err != nil {
+		cleanup()
+		return preparedProgram{}, fmt.Errorf("não foi possível listar os arquivos compilados em %q: %w", buildDir, err)
+	}
+
+	var classFiles []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".class") {
+			classFiles = append(classFiles, entry.Name())
+		}
+	}
+	if len(classFiles) == 0 {
+		cleanup()
+		return preparedProgram{}, errors.New("erro de compilação (Java): nenhum arquivo .class foi gerado")
+	}
+
+	manifest := fmt.Sprintf("Main-Class: %s\n", mainClass)
+	if err := os.WriteFile(filepath.Join(buildDir, "Manifest.txt"), []byte(manifest), 0o600); err != nil {
+		cleanup()
+		return preparedProgram{}, fmt.Errorf("não foi possível gerar Manifest.txt: %w", err)
+	}
+
+	jarArgs := make([]string, 0, 3+len(classFiles))
+	jarArgs = append(jarArgs, "cfm", "prog.jar", "Manifest.txt")
+	jarArgs = append(jarArgs, classFiles...)
+	if err := runCompileCommand(ctx, LangJava, limits.CompilationTime, buildDir, nil, jarPath, jarArgs...); err != nil {
+		cleanup()
+		return preparedProgram{}, err
+	}
+
+	return buildJarProgram(javaPath, filepath.Join(buildDir, "prog.jar"), limits.Memory, cleanup), nil
+}
+
+func prepareKotlinProgram(
+	ctx context.Context,
+	cfg RunConfig,
+	limits oracle.ProblemLimits,
+	lookPath func(string) (string, error),
+	hooks RunHooks,
+) (preparedProgram, error) {
+	kotlincPath, err := lookPath("kotlinc")
+	if err != nil {
+		return preparedProgram{}, errors.New("compilador Kotlin (kotlinc) não encontrado no PATH; instale o Kotlin para executar arquivos .kt")
+	}
+	javaPath, err := lookPath("java")
+	if err != nil {
+		return preparedProgram{}, errors.New("runtime Java (java) não encontrado no PATH; instale um JDK/JRE para executar arquivos .kt")
+	}
+
+	buildDir, err := os.MkdirTemp("", "mrtn-kt-*")
+	if err != nil {
+		return preparedProgram{}, fmt.Errorf("não foi possível criar diretório temporário de compilação: %w", err)
+	}
+	cleanup := func() {
+		_ = os.RemoveAll(buildDir)
+	}
+
+	baseName := filepath.Base(cfg.FilePath)
+	if _, err := copySourceToDir(cfg.FilePath, buildDir, baseName); err != nil {
+		cleanup()
+		return preparedProgram{}, err
+	}
+
+	if hooks.OnCompileStart != nil {
+		hooks.OnCompileStart(cfg.FilePath, LangKotlin, "kotlinc")
+	}
+
+	kotlincEnv := []string{"JAVA_OPTS=-Xmx700M -Xms64M"}
+	if err := runCompileCommand(ctx, LangKotlin, limits.CompilationTime, buildDir, kotlincEnv, kotlincPath, baseName, "-include-runtime", "-d", "prog.jar"); err != nil {
+		cleanup()
+		return preparedProgram{}, err
+	}
+
+	return buildJarProgram(javaPath, filepath.Join(buildDir, "prog.jar"), limits.Memory, cleanup), nil
+}
+
+func buildJarProgram(javaPath, jarFile string, memoryLimitMB int, cleanup func()) preparedProgram {
+	memMB := DefaultJavaMemMB
+	if memoryLimitMB > 0 {
+		memMB = memoryLimitMB
+	}
+
+	return preparedProgram{
+		runtimeName: "java",
+		buildCmd: func(caseCtx context.Context) *exec.Cmd {
+			return exec.CommandContext(
+				caseCtx,
+				javaPath,
+				"-Xms10m",
+				fmt.Sprintf("-Xmx%dm", memMB),
+				fmt.Sprintf("-Xss%dk", DefaultJavaStackKB),
+				"-jar",
+				jarFile,
+			)
+		},
+		cleanup: cleanup,
+	}
+}
+
+func detectJavaPublicType(src string) string {
+	matches := javaPublicTypeRe.FindStringSubmatch(src)
+	if len(matches) < 2 {
+		return ""
+	}
+	return matches[1]
+}
+
+func copySourceToDir(srcPath, destDir, targetName string) ([]byte, error) {
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return nil, fmt.Errorf("não foi possível ler o arquivo %q: %w", srcPath, err)
+	}
+	if err := os.WriteFile(filepath.Join(destDir, targetName), data, 0o600); err != nil {
+		return nil, fmt.Errorf("não foi possível preparar cópia temporária de %q: %w", srcPath, err)
+	}
+	return data, nil
 }
 
 func compileNativeProgram(
@@ -301,7 +492,7 @@ func compileNativeProgram(
 	args = append(args, cfg.FilePath, "-o", binPath)
 	args = append(args, trailingFlags...)
 
-	if err := runCompileCommand(ctx, cfg.Language, compileLimitSec, "", compilerPath, args...); err != nil {
+	if err := runCompileCommand(ctx, cfg.Language, compileLimitSec, "", nil, compilerPath, args...); err != nil {
 		cleanup()
 		return preparedProgram{}, err
 	}
@@ -320,6 +511,7 @@ func runCompileCommand(
 	lang Language,
 	compileLimitSec int,
 	dir string,
+	extraEnv []string,
 	bin string,
 	args ...string,
 ) error {
@@ -334,6 +526,9 @@ func runCompileCommand(
 	cmd := exec.CommandContext(compileCtx, bin, args...)
 	if dir != "" {
 		cmd.Dir = dir
+	}
+	if len(extraEnv) > 0 {
+		cmd.Env = append(os.Environ(), extraEnv...)
 	}
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

@@ -111,16 +111,15 @@ mrtn clear
 
 As linguagens oficiais da Maratona de Programação SBC são **C, C++, Java, Kotlin e Python**.
 
-* **Versão atual:** Suporte para **Python (`.py`)**, **C (`.c`)** e **C++ (`.cpp`, `.cc`, `.cxx`)**.
-* **Próximas versões:** Suporte aos compiladores e runners de **Java (`.java`)** e **Kotlin (`.kt`)**.
+* **Versão atual:** Suporte completo para todas as 5 linguagens oficiais: **Python (`.py`)**, **C (`.c`)**, **C++ (`.cpp`, `.cc`, `.cxx`)**, **Java (`.java`)** e **Kotlin (`.kt`)**.
 
 | Linguagem | Extensão | Status Atual | Compilador / Interpretador |
 | :--- | :--- | :--- | :--- |
 | **Python** | `.py` | ✅ Suportado | `pypy3` / `python3` / `python` (`py_compile`) |
 | **C** | `.c` | ✅ Suportado | `gcc -std=gnu11 -O2 -lm -static` |
 | **C++** | `.cpp`, `.cc`, `.cxx` | ✅ Suportado | `g++ -std=c++20 -O2 -lm -static` |
-| **Java** | `.java` | ⏳ Em breve | `javac` & `java` |
-| **Kotlin** | `.kt` | ⏳ Em breve | `kotlinc` & `kotlin` |
+| **Java** | `.java` | ✅ Suportado | `javac` + `jar` & `java` (`-Xmx`, `-Xss131072k`) |
+| **Kotlin** | `.kt` | ✅ Suportado | `kotlinc -include-runtime` & `java` (`-Xmx`, `-Xss131072k`) |
 
 ---
 
@@ -170,11 +169,10 @@ go build -o mrtn ./cmd/mrtn
 - [x] Estrutura base da CLI (`mrtn sync`, `mrtn info`, `mrtn test` e `mrtn clear`)
 - [x] Implementação de `mrtn sync` (integração Git / GitHub com `mrtn-oracle`)
 - [x] Implementação de `mrtn info` (inspeção de provas, questões e testes)
-- [x] Implementação dos runners para Python (`.py`), C (`.c`) e C++ (`.cpp`, `.cc`, `.cxx`)
+- [x] Implementação dos runners para Python (`.py`), C (`.c`), C++ (`.cpp`, `.cc`, `.cxx`), Java (`.java`) e Kotlin (`.kt`)
 - [x] Comparador de saídas com diff formatado e normalização de quebras de linha
 - [x] Implementação de timeouts (TLE) e tratamento de erros de runtime (RTE)
 - [x] Suporte multiplataforma testado em Linux e Windows
-- [ ] Adição futura dos runners para Java e Kotlin
 
 ---
 
