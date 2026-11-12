@@ -111,14 +111,14 @@ mrtn clear
 
 As linguagens oficiais da Maratona de Programação SBC são **C, C++, Java, Kotlin e Python**.
 
-* **Versão atual:** Foco inicial e suporte para **Python (`.py`)**.
-* **Próximas versões:** Suporte aos compiladores e runners de **C (`.c`)**, **C++ (`.cpp`)**, **Java (`.java`)** e **Kotlin (`.kt`)**.
+* **Versão atual:** Suporte para **Python (`.py`)**, **C (`.c`)** e **C++ (`.cpp`, `.cc`)**.
+* **Próximas versões:** Suporte aos compiladores e runners de **Java (`.java`)** e **Kotlin (`.kt`)**.
 
 | Linguagem | Extensão | Status Atual | Compilador / Interpretador |
 | :--- | :--- | :--- | :--- |
 | **Python** | `.py` | ✅ Suportado | `python3` / `pypy3` / `python` |
-| **C** | `.c` | ⏳ Em breve | `gcc -O2 -std=c11` |
-| **C++** | `.cpp`, `.cc` | ⏳ Em breve | `g++ -O2 -std=c++17` |
+| **C** | `.c` | ✅ Suportado | `gcc -O2 -std=c11` |
+| **C++** | `.cpp`, `.cc` | ✅ Suportado | `g++ -O2 -std=c++17` |
 | **Java** | `.java` | ⏳ Em breve | `javac` & `java` |
 | **Kotlin** | `.kt` | ⏳ Em breve | `kotlinc` & `kotlin` |
 
@@ -170,11 +170,11 @@ go build -o mrtn ./cmd/mrtn
 - [x] Estrutura base da CLI (`mrtn sync`, `mrtn info`, `mrtn test` e `mrtn clear`)
 - [x] Implementação de `mrtn sync` (integração Git / GitHub com `mrtn-oracle`)
 - [x] Implementação de `mrtn info` (inspeção de provas, questões e testes)
-- [x] Implementação do runner para Python (`.py`)
+- [x] Implementação dos runners para Python (`.py`), C (`.c`) e C++ (`.cpp`, `.cc`)
 - [x] Comparador de saídas com diff formatado e normalização de quebras de linha
 - [x] Implementação de timeouts (TLE) e tratamento de erros de runtime (RTE)
 - [ ] Suporte multiplataforma testado em Linux e Windows
-- [ ] Adição futura dos runners para C, C++, Java e Kotlin
+- [ ] Adição futura dos runners para Java e Kotlin
 
 ---
 

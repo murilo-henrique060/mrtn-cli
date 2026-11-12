@@ -7,14 +7,29 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/murilo-henrique060/mrtn-cli/internal/oracle"
 )
 
-// DefaultTimeLimit is used when problem.yaml does not specify limits.time.
-const DefaultTimeLimit = 5 * time.Second
+const (
+	// DefaultTimeLimit is used when problem.yaml does not specify limits.time.
+	DefaultTimeLimit = 5 * time.Second
+	// DefaultCompileLimit is used when problem.yaml does not specify limits.compilation_time.
+	DefaultCompileLimit = 60 * time.Second
+)
+
+// Language identifies a programming language supported by the runner.
+type Language string
+
+const (
+	LangPython Language = "Python"
+	LangC      Language = "C"
+	LangCPP    Language = "C++"
+)
 
 // Verdict represents the evaluation outcome of a single test case.
 type Verdict string
@@ -32,6 +47,7 @@ type RunConfig struct {
 	Question          string
 	TestNumber        int // 0 runs all tests; >= 1 runs only that 1-based index.
 	FilePath          string
+	Language          Language
 	TimeLimitOverride time.Duration
 	LookPath          func(string) (string, error)
 }
@@ -49,13 +65,26 @@ type CaseResult struct {
 // RunReport summarizes all executed test cases.
 type RunReport struct {
 	Detail      oracle.QuestionDetail
-	Interpreter string
+	RuntimeName string
 	TimeLimit   time.Duration
 	Results     []CaseResult
 	TotalTime   time.Duration
 	Passed      int
 	Failed      int
 	Counts      map[Verdict]int
+}
+
+// RunHooks provides optional progress callbacks during compilation and test execution.
+type RunHooks struct {
+	OnCompileStart func(filePath string, lang Language, compiler string)
+	OnStart        func(detail oracle.QuestionDetail, runtimeName string, timeLimit time.Duration, total int)
+	OnCaseDone     func(CaseResult)
+}
+
+type preparedProgram struct {
+	runtimeName string
+	buildCmd    func(ctx context.Context) *exec.Cmd
+	cleanup     func()
 }
 
 // ResolvePythonInterpreter locates a working Python interpreter in PATH
@@ -83,14 +112,8 @@ func ResolvePythonInterpreter(lookPath func(string) (string, error)) (string, er
 	return "", errors.New("nenhum interpretador Python encontrado no PATH (tentado: python3, pypy3, python)")
 }
 
-// RunHooks provides optional progress callbacks during test execution.
-type RunHooks struct {
-	OnStart    func(detail oracle.QuestionDetail, interpreter string, timeLimit time.Duration, total int)
-	OnCaseDone func(CaseResult)
-}
-
-// ExecutePythonTests validates oracle files, resolves the Python interpreter, and runs the requested tests.
-func ExecutePythonTests(ctx context.Context, cfg RunConfig, hooks RunHooks) (RunReport, error) {
+// ExecuteTests validates oracle files, prepares/compiles the solution if needed, and runs the requested tests.
+func ExecuteTests(ctx context.Context, cfg RunConfig, hooks RunHooks) (RunReport, error) {
 	detail, err := oracle.ListTests(cfg.Contest, cfg.Question)
 	if err != nil {
 		return RunReport{}, err
@@ -110,10 +133,11 @@ func ExecutePythonTests(ctx context.Context, cfg RunConfig, hooks RunHooks) (Run
 		selected = detail.Tests[cfg.TestNumber-1 : cfg.TestNumber]
 	}
 
-	interpreter, err := ResolvePythonInterpreter(cfg.LookPath)
+	program, err := prepareProgram(ctx, cfg, detail.Meta.Limits.CompilationTime, hooks)
 	if err != nil {
 		return RunReport{}, err
 	}
+	defer program.cleanup()
 
 	timeLimit := DefaultTimeLimit
 	if cfg.TimeLimitOverride > 0 {
@@ -123,19 +147,19 @@ func ExecutePythonTests(ctx context.Context, cfg RunConfig, hooks RunHooks) (Run
 	}
 
 	if hooks.OnStart != nil {
-		hooks.OnStart(detail, interpreter, timeLimit, len(selected))
+		hooks.OnStart(detail, program.runtimeName, timeLimit, len(selected))
 	}
 
 	report := RunReport{
 		Detail:      detail,
-		Interpreter: interpreter,
+		RuntimeName: program.runtimeName,
 		TimeLimit:   timeLimit,
 		Results:     make([]CaseResult, 0, len(selected)),
 		Counts:      make(map[Verdict]int),
 	}
 
 	for _, tc := range selected {
-		res, runErr := runSinglePythonCase(ctx, interpreter, cfg.FilePath, tc, timeLimit)
+		res, runErr := runSingleCase(ctx, program.buildCmd, tc, timeLimit)
 		if runErr != nil {
 			return report, runErr
 		}
@@ -157,10 +181,119 @@ func ExecutePythonTests(ctx context.Context, cfg RunConfig, hooks RunHooks) (Run
 	return report, nil
 }
 
-func runSinglePythonCase(
+func prepareProgram(
 	ctx context.Context,
-	interpreter string,
-	scriptPath string,
+	cfg RunConfig,
+	compileLimitSec int,
+	hooks RunHooks,
+) (preparedProgram, error) {
+	lookPath := cfg.LookPath
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
+
+	switch cfg.Language {
+	case LangPython:
+		interpreter, err := ResolvePythonInterpreter(lookPath)
+		if err != nil {
+			return preparedProgram{}, err
+		}
+		return preparedProgram{
+			runtimeName: filepath.Base(interpreter),
+			buildCmd: func(caseCtx context.Context) *exec.Cmd {
+				return exec.CommandContext(caseCtx, interpreter, cfg.FilePath)
+			},
+			cleanup: func() {},
+		}, nil
+
+	case LangC:
+		return compileNativeProgram(ctx, cfg, compileLimitSec, lookPath, hooks, "gcc", []string{"-O2", "-std=c11"}, []string{"-lm"})
+
+	case LangCPP:
+		return compileNativeProgram(ctx, cfg, compileLimitSec, lookPath, hooks, "g++", []string{"-O2", "-std=c++17"}, nil)
+
+	default:
+		return preparedProgram{}, fmt.Errorf("linguagem não suportada pelo runner: %s", cfg.Language)
+	}
+}
+
+func compileNativeProgram(
+	ctx context.Context,
+	cfg RunConfig,
+	compileLimitSec int,
+	lookPath func(string) (string, error),
+	hooks RunHooks,
+	compilerName string,
+	frontFlags []string,
+	trailingFlags []string,
+) (preparedProgram, error) {
+	compilerPath, err := lookPath(compilerName)
+	if err != nil {
+		return preparedProgram{}, fmt.Errorf(
+			"compilador %s (%s) não encontrado no PATH; instale o %s para executar arquivos %s",
+			cfg.Language, compilerName, strings.ToUpper(compilerName), filepath.Ext(cfg.FilePath),
+		)
+	}
+
+	buildDir, err := os.MkdirTemp("", "mrtn-build-*")
+	if err != nil {
+		return preparedProgram{}, fmt.Errorf("não foi possível criar diretório temporário de compilação: %w", err)
+	}
+	cleanup := func() {
+		_ = os.RemoveAll(buildDir)
+	}
+
+	binName := "solution"
+	if runtime.GOOS == "windows" {
+		binName += ".exe"
+	}
+	binPath := filepath.Join(buildDir, binName)
+
+	if hooks.OnCompileStart != nil {
+		hooks.OnCompileStart(cfg.FilePath, cfg.Language, compilerName)
+	}
+
+	compileTimeout := DefaultCompileLimit
+	if compileLimitSec > 0 {
+		compileTimeout = time.Duration(compileLimitSec) * time.Second
+	}
+	compileCtx, cancel := context.WithTimeout(ctx, compileTimeout)
+	defer cancel()
+
+	args := make([]string, 0, len(frontFlags)+len(trailingFlags)+3)
+	args = append(args, frontFlags...)
+	args = append(args, cfg.FilePath, "-o", binPath)
+	args = append(args, trailingFlags...)
+
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(compileCtx, compilerPath, args...)
+	cmd.Stderr = &stderr
+	cmd.WaitDelay = 500 * time.Millisecond
+
+	if err := cmd.Run(); err != nil {
+		cleanup()
+		if errors.Is(compileCtx.Err(), context.DeadlineExceeded) {
+			return preparedProgram{}, fmt.Errorf("tempo limite de compilação excedido (%s)", compileTimeout)
+		}
+		errMsg := formatStderrSnippet(stderr.String())
+		if errMsg != "" {
+			return preparedProgram{}, fmt.Errorf("erro de compilação (%s):\n%s", cfg.Language, errMsg)
+		}
+		return preparedProgram{}, fmt.Errorf("erro de compilação (%s): %w", cfg.Language, err)
+	}
+
+	return preparedProgram{
+		runtimeName: compilerName,
+		buildCmd: func(caseCtx context.Context) *exec.Cmd {
+			return exec.CommandContext(caseCtx, binPath)
+		},
+		cleanup: cleanup,
+	}, nil
+}
+
+func runSingleCase(
+	ctx context.Context,
+	buildCmd func(context.Context) *exec.Cmd,
 	tc oracle.TestCaseSummary,
 	timeLimit time.Duration,
 ) (CaseResult, error) {
@@ -179,7 +312,7 @@ func runSinglePythonCase(
 	defer cancel()
 
 	var stdout, stderr bytes.Buffer
-	cmd := exec.CommandContext(caseCtx, interpreter, scriptPath)
+	cmd := buildCmd(caseCtx)
 	cmd.Stdin = inFile
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

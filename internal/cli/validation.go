@@ -7,19 +7,27 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/murilo-henrique060/mrtn-cli/internal/runner"
 )
 
 // Language identifies the programming language detected from a solution file.
-type Language string
+type Language = runner.Language
 
 const (
-	LangPython Language = "Python"
+	LangPython = runner.LangPython
+	LangC      = runner.LangC
+	LangCPP    = runner.LangCPP
 )
 
+var supportedLanguages = map[string]Language{
+	".py":  LangPython,
+	".c":   LangC,
+	".cpp": LangCPP,
+	".cc":  LangCPP,
+}
+
 var plannedLanguages = map[string]string{
-	".c":    "C",
-	".cpp":  "C++",
-	".cc":   "C++",
 	".java": "Java",
 	".kt":   "Kotlin",
 }
@@ -101,17 +109,17 @@ func ValidateSourceFile(path string) (Language, error) {
 	}
 
 	ext := strings.ToLower(filepath.Ext(trimmed))
-	if ext == ".py" {
-		return LangPython, nil
+	if lang, ok := supportedLanguages[ext]; ok {
+		return lang, nil
 	}
 
 	if planned, ok := plannedLanguages[ext]; ok {
-		return "", fmt.Errorf("a linguagem %s (%s) ainda não tem suporte nesta versão; a versão atual suporta apenas Python (.py)", planned, ext)
+		return "", fmt.Errorf("a linguagem %s (%s) ainda não tem suporte nesta versão; suportadas atualmente: Python (.py), C (.c), C++ (.cpp, .cc)", planned, ext)
 	}
 
 	if ext == "" {
-		return "", fmt.Errorf("arquivo %q não possui extensão; linguagens suportadas atualmente: Python (.py)", trimmed)
+		return "", fmt.Errorf("arquivo %q não possui extensão; linguagens suportadas atualmente: Python (.py), C (.c), C++ (.cpp, .cc)", trimmed)
 	}
 
-	return "", fmt.Errorf("extensão de arquivo não suportada %q; linguagens suportadas atualmente: Python (.py)", ext)
+	return "", fmt.Errorf("extensão de arquivo não suportada %q; linguagens suportadas atualmente: Python (.py), C (.c), C++ (.cpp, .cc)", ext)
 }

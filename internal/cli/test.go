@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -83,19 +82,23 @@ func runTest(args []string, stdout, _ io.Writer) error {
 		Question:   opts.Question,
 		TestNumber: opts.TestNumber,
 		FilePath:   opts.FilePath,
+		Language:   opts.Language,
 	}
 
 	detailed := opts.TestNumber > 0
 	hooks := runner.RunHooks{
-		OnStart: func(detail oracle.QuestionDetail, interpreter string, timeLimit time.Duration, total int) {
-			printRunHeader(stdout, detail, opts, interpreter, timeLimit, total)
+		OnCompileStart: func(filePath string, lang runner.Language, compiler string) {
+			fmt.Fprintf(stdout, "Compilando %s (%s via %s)...\n", filePath, lang, compiler)
+		},
+		OnStart: func(detail oracle.QuestionDetail, runtimeName string, timeLimit time.Duration, total int) {
+			printRunHeader(stdout, detail, opts, runtimeName, timeLimit, total)
 		},
 		OnCaseDone: func(res runner.CaseResult) {
 			printCaseResult(stdout, res, detailed)
 		},
 	}
 
-	report, err := runner.ExecutePythonTests(context.Background(), cfg, hooks)
+	report, err := runner.ExecuteTests(context.Background(), cfg, hooks)
 	if err != nil {
 		return err
 	}
@@ -108,7 +111,7 @@ func printRunHeader(
 	w io.Writer,
 	detail oracle.QuestionDetail,
 	opts TestOptions,
-	interpreter string,
+	runtimeName string,
 	timeLimit time.Duration,
 	total int,
 ) {
@@ -124,7 +127,7 @@ func printRunHeader(
 		"Arquivo: %s (%s via %s) | Limite de tempo: %s | Casos: %d\n",
 		opts.FilePath,
 		opts.Language,
-		filepath.Base(interpreter),
+		runtimeName,
 		timeLimit,
 		total,
 	)
@@ -189,6 +192,6 @@ Descrição:
     <prova>             Identificador da prova (ex: 2026-1)
     <questao>           Identificador da questão, case-insensitive (ex: a ou A)
     [numero-do-teste]   Índice numérico do teste a partir de 1 (opcional)
-    <arquivo>           Caminho para o arquivo-fonte (atualmente: .py)
+    <arquivo>           Caminho para o arquivo-fonte (.py, .c, .cpp, .cc)
 `)
 }
