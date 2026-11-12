@@ -6,8 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"strings"
 )
+
+// Version holds the CLI version, injected via -ldflags or resolved from Go build info.
+var Version = "dev"
 
 type commandError struct {
 	err   error
@@ -34,6 +38,11 @@ func Execute(args []string, stdout, stderr io.Writer) int {
 
 	if subcmd == "-h" || subcmd == "--help" {
 		printRootUsage(stdout)
+		return 0
+	}
+
+	if subcmd == "version" || subcmd == "-v" || subcmd == "--version" {
+		fmt.Fprintf(stdout, "mrtn %s\n", resolveVersion())
 		return 0
 	}
 
@@ -125,6 +134,16 @@ func parseSubcommandFlags(name string, args []string, usage func(io.Writer)) (po
 	return fs.Args(), false, nil
 }
 
+func resolveVersion() string {
+	if Version != "" && Version != "dev" {
+		return Version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		return info.Main.Version
+	}
+	return Version
+}
+
 func printRootUsage(w io.Writer) {
 	fmt.Fprint(w, `mrtn - Minimal Runtime Test Node
 
@@ -132,11 +151,12 @@ Uso:
   mrtn <comando> [argumentos]
 
 Comandos disponíveis:
-  sync    Sincroniza o repositório de casos de teste (mrtn-oracle)
-  info    Consulta provas, questões e casos de teste disponíveis
-  test    Executa e valida sua solução contra os casos de teste
-  clear   Remove os dados locais das provas e questões sincronizadas
-  help    Exibe ajuda sobre um comando específico
+  sync      Sincroniza o repositório de casos de teste (mrtn-oracle)
+  info      Consulta provas, questões e casos de teste disponíveis
+  test      Executa e valida sua solução contra os casos de teste
+  clear     Remove os dados locais das provas e questões sincronizadas
+  version   Exibe a versão da CLI
+  help      Exibe ajuda sobre um comando específico
 
 Use "mrtn <comando> --help" para mais informações sobre cada comando.
 `)
