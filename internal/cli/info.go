@@ -199,7 +199,7 @@ func printQuestionHeader(w io.Writer, detail oracle.QuestionDetail) {
 
 	var metaParts []string
 	if detail.Meta.Limits.Time > 0 {
-		metaParts = append(metaParts, fmt.Sprintf("tempo=%ds", detail.Meta.Limits.Time))
+		metaParts = append(metaParts, fmt.Sprintf("tempo=%gs", detail.Meta.Limits.Time))
 	}
 	if detail.Meta.Limits.Memory > 0 {
 		metaParts = append(metaParts, fmt.Sprintf("memória=%d MB", detail.Meta.Limits.Memory))

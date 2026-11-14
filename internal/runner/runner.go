@@ -18,7 +18,8 @@ import (
 
 const (
 	// DefaultTimeLimit is used when problem.yaml does not specify limits.time.
-	DefaultTimeLimit = 5 * time.Second
+	// In the ICPC problem package standard (problem_format_version: 2025-09), the default time limit is 1s.
+	DefaultTimeLimit = 1 * time.Second
 	// DefaultCompileLimit is used when problem.yaml does not specify limits.compilation_time.
 	DefaultCompileLimit = 60 * time.Second
 	// DefaultJavaMemMB is used when problem.yaml does not specify limits.memory.
@@ -152,7 +153,7 @@ func ExecuteTests(ctx context.Context, cfg RunConfig, hooks RunHooks) (RunReport
 	if cfg.TimeLimitOverride > 0 {
 		timeLimit = cfg.TimeLimitOverride
 	} else if detail.Meta.Limits.Time > 0 {
-		timeLimit = time.Duration(detail.Meta.Limits.Time) * time.Second
+		timeLimit = time.Duration(detail.Meta.Limits.Time * float64(time.Second))
 	}
 
 	if hooks.OnStart != nil {

@@ -9,7 +9,7 @@ import (
 
 // ProblemLimits stores resource limits parsed from problem.yaml.
 type ProblemLimits struct {
-	Time             int
+	Time             float64
 	Memory           int
 	Output           int
 	CompilationTime  int
@@ -185,13 +185,17 @@ func unquoteYAML(s string) string {
 }
 
 func assignLimit(l *ProblemLimits, key, val string) {
+	if key == "time" {
+		if f, err := strconv.ParseFloat(val, 64); err == nil {
+			l.Time = f
+		}
+		return
+	}
 	n, err := strconv.Atoi(val)
 	if err != nil {
 		return
 	}
 	switch key {
-	case "time":
-		l.Time = n
 	case "memory":
 		l.Memory = n
 	case "output":
