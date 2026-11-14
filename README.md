@@ -128,84 +128,92 @@ As linguagens oficiais da Maratona de Programação SBC são **C, C++, Java, Kot
 ### Pré-requisitos
 * [Git](https://git-scm.com/) instalado no sistema (para clonagem/sincronização dos casos de teste com o `mrtn sync`).
 * Compiladores e interpretadores das linguagens que você pretende utilizar (ex: `pypy3` / `python3`, `gcc`, `g++`, `javac` / `java`, `kotlinc`).
-* [Go](https://go.dev/) (versão 1.21 ou superior) — necessário apenas para instalação via `go install` ou compilação manual.
 
-### 1. Via `go install` (Recomendado)
+---
 
-A forma mais simples e direta para quem já utiliza Go:
+### 1. Instalação Automática (Recomendado)
+
+Instale o `mrtn` com apenas um comando no terminal (não necessita ter o Go instalado):
+
+#### Linux & macOS (Terminal)
+```bash
+curl -fsSL https://raw.githubusercontent.com/murilo-henrique060/mrtn-cli/main/install.sh | bash
+```
+> O instalador detecta automaticamente seu sistema e arquitetura (`amd64` ou `arm64`), instala o binário em `~/.local/bin` (ou `/usr/local/bin`) e orienta a configuração do `PATH`.
+
+#### Windows (PowerShell)
+Abra o **PowerShell** e execute:
+```powershell
+irm https://raw.githubusercontent.com/murilo-henrique060/mrtn-cli/main/install.ps1 | iex
+```
+> O script baixa o `mrtn.exe` compatível, coloca em `%LOCALAPPDATA%\Programs\mrtn` e adiciona automaticamente à variável de ambiente `PATH` do usuário.
+
+#### Windows (Duplo Clique via Arquivo `.bat`)
+Se preferir não digitar comandos:
+1. Baixe os arquivos [`install.bat`](https://raw.githubusercontent.com/murilo-henrique060/mrtn-cli/main/install.bat) e [`install.ps1`](https://raw.githubusercontent.com/murilo-henrique060/mrtn-cli/main/install.ps1) na mesma pasta.
+2. Dê **duplo clique** em `install.bat`.
+
+---
+
+### 2. Via `go install` (Para desenvolvedores Go)
 
 ```bash
 go install github.com/murilo-henrique060/mrtn-cli/cmd/mrtn@latest
 ```
 
-> **Nota:** Certifique-se de que o diretório de binários do Go (`$GOPATH/bin` ou `~/go/bin`) esteja no seu `PATH` para executar o comando `mrtn` diretamente no terminal:
+> **Nota:** Certifique-se de que o diretório de binários do Go (`$GOPATH/bin` ou `~/go/bin`) esteja no seu `PATH`:
 > - **Linux/macOS:** `export PATH=$PATH:$(go env GOPATH)/bin` (adicione ao seu `~/.bashrc` ou `~/.zshrc`)
 > - **Windows:** Verifique se `%USERPROFILE%\go\bin` está presente na variável de ambiente `PATH`.
 
 ---
 
-### 2. Via binários pré-compilados (sem precisar do Go)
+### 3. Via binários pré-compilados manuais
 
-Baixe o executável correspondente ao seu sistema operacional na página de [Releases](https://github.com/murilo-henrique060/mrtn-cli/releases/tag/v1.0.0):
+Baixe o executável correspondente ao seu sistema operacional na página de [Releases](https://github.com/murilo-henrique060/mrtn-cli/releases/tag/v1.0.1):
 
-| Sistema | Arquitetura | Pacote (`v1.0.0`) |
+| Sistema | Arquitetura | Pacote (`v1.0.1`) |
 | :--- | :--- | :--- |
-| **Linux** | x86_64 (`amd64`) | `mrtn-v1.0.0-linux-amd64` |
-| **Linux** | ARM64 (`arm64`) | `mrtn-v1.0.0-linux-arm64` |
-| **Windows** | x86_64 (`amd64`) | `mrtn-v1.0.0-windows-amd64.exe` |
-| **Windows** | ARM64 (`arm64`) | `mrtn-v1.0.0-windows-arm64.exe` |
-| **macOS** | Intel (`amd64`) | `mrtn-v1.0.0-darwin-amd64` |
-| **macOS** | Apple Silicon (`arm64`) | `mrtn-v1.0.0-darwin-arm64` |
+| **Linux** | x86_64 (`amd64`) | `mrtn-v1.0.1-linux-amd64` |
+| **Linux** | ARM64 (`arm64`) | `mrtn-v1.0.1-linux-arm64` |
+| **Windows** | x86_64 (`amd64`) | `mrtn-v1.0.1-windows-amd64.exe` |
+| **Windows** | ARM64 (`arm64`) | `mrtn-v1.0.1-windows-arm64.exe` |
+| **macOS** | Intel (`amd64`) | `mrtn-v1.0.1-darwin-amd64` |
+| **macOS** | Apple Silicon (`arm64`) | `mrtn-v1.0.1-darwin-arm64` |
 
 #### Linux
 ```bash
-# Baixe o binário (substitua amd64 por arm64 se necessário)
-curl -LO https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.0/mrtn-v1.0.0-linux-amd64
-
-# Dê permissão de execução e mova para o PATH
-chmod +x mrtn-v1.0.0-linux-amd64
-sudo mv mrtn-v1.0.0-linux-amd64 /usr/local/bin/mrtn
-
-# Verifique a instalação
+curl -LO https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.1/mrtn-v1.0.1-linux-amd64
+chmod +x mrtn-v1.0.1-linux-amd64
+sudo mv mrtn-v1.0.1-linux-amd64 /usr/local/bin/mrtn
 mrtn --version
 ```
 
 #### macOS
 ```bash
-# Baixe o binário (use darwin-arm64 para Apple Silicon ou darwin-amd64 para Intel)
-curl -LO https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.0/mrtn-v1.0.0-darwin-arm64
-
-# Dê permissão de execução e mova para o PATH
-chmod +x mrtn-v1.0.0-darwin-arm64
-sudo mv mrtn-v1.0.0-darwin-arm64 /usr/local/bin/mrtn
-
-# Verifique a instalação
+curl -LO https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.1/mrtn-v1.0.1-darwin-arm64
+chmod +x mrtn-v1.0.1-darwin-arm64
+sudo mv mrtn-v1.0.1-darwin-arm64 /usr/local/bin/mrtn
 mrtn --version
 ```
 
-#### Windows (PowerShell)
+#### Windows (Manual via PowerShell)
 ```powershell
-# Crie uma pasta para o binário e baixe o executável (ou use windows-arm64.exe)
-New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\mrtn\bin" | Out-Null
+New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\Programs\mrtn" | Out-Null
 Invoke-WebRequest `
-  -Uri "https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.0/mrtn-v1.0.0-windows-amd64.exe" `
-  -OutFile "$env:LOCALAPPDATA\mrtn\bin\mrtn.exe"
+  -Uri "https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.1/mrtn-v1.0.1-windows-amd64.exe" `
+  -OutFile "$env:LOCALAPPDATA\Programs\mrtn\mrtn.exe"
 
-# Adicione ao PATH do usuário (reinicie o terminal depois)
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($userPath -notlike "*$env:LOCALAPPDATA\mrtn\bin*") {
-  [Environment]::SetEnvironmentVariable("Path", "$userPath;$env:LOCALAPPDATA\mrtn\bin", "User")
+if ($userPath -notlike "*$env:LOCALAPPDATA\Programs\mrtn*") {
+  [Environment]::SetEnvironmentVariable("Path", "$userPath;$env:LOCALAPPDATA\Programs\mrtn", "User")
 }
-
-# Verifique a instalação (após reabrir o terminal)
-mrtn --version
 ```
 
 > **Verificação de integridade (opcional):** Os hashes SHA-256 dos binários estão disponíveis em `checksums.txt` na release (`sha256sum -c checksums.txt --ignore-missing`).
 
 ---
 
-### 3. Compilando a partir do código-fonte
+### 4. Compilando a partir do código-fonte
 
 Para desenvolvimento ou compilação manual:
 
