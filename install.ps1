@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Instalador automatizado do mrtn para Windows (PowerShell)
     https://github.com/murilo-henrique060/mrtn-cli
@@ -40,8 +40,15 @@ $targetExe = Join-Path $InstallDir "mrtn.exe"
 $binaryName = "mrtn-$Version-windows-$arch.exe"
 
 # 3. Locate local binary or download
-$localBinary = Join-Path $PSScriptRoot "dist\$Version\$binaryName"
-if (Test-Path -Path $localBinary) {
+$localBinary = $null
+if (-not [string]::IsNullOrEmpty($PSScriptRoot)) {
+    $candidate = Join-Path $PSScriptRoot "dist\$Version\$binaryName"
+    if (Test-Path -Path $candidate) {
+        $localBinary = $candidate
+    }
+}
+
+if ($localBinary) {
     Write-Host "Usando binário local: $localBinary" -ForegroundColor Yellow
     Copy-Item -Path $localBinary -Destination $targetExe -Force
 } else {
@@ -49,6 +56,7 @@ if (Test-Path -Path $localBinary) {
     $downloadUrl = "https://github.com/$repo/releases/download/$Version/$binaryName"
     Write-Host "Baixando $binaryName de $downloadUrl..." -ForegroundColor Yellow
     
+    $ProgressPreference = 'SilentlyContinue'
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     $tempFile = [System.IO.Path]::GetTempFileName()
     try {
@@ -65,7 +73,8 @@ Write-Host "Executável instalado em: $targetExe" -ForegroundColor Green
 
 # 4. Configure PATH
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-$paths = $userPath -split ';' | Where-Object { $_ -ne "" }
+if ($null -eq $userPath) { $userPath = "" }
+$paths = @($userPath -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 if ($paths -notcontains $InstallDir) {
     Write-Host "Adicionando $InstallDir à variável PATH do usuário..." -ForegroundColor Yellow
     $newPath = ($paths + $InstallDir) -join ';'
