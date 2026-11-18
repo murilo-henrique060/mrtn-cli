@@ -32,12 +32,14 @@ type TestCaseSummary struct {
 	OutputSize int64
 }
 
-// QuestionDetail contains full metadata and ordered test cases for a question.
+// QuestionDetail contains full metadata, optional statement, and ordered test cases for a question.
 type QuestionDetail struct {
-	Contest  string
-	Question string
-	Meta     ProblemMeta
-	Tests    []TestCaseSummary
+	Contest       string
+	Question      string
+	Meta          ProblemMeta
+	StatementPath string
+	Statement     string
+	Tests         []TestCaseSummary
 }
 
 // TestCaseDetail holds a test case summary along with its input and expected output contents.
@@ -271,11 +273,22 @@ func ListTests(contest, question string) (QuestionDetail, error) {
 		})
 	}
 
+	var statementPath, statement string
+	stmtCandidate := filepath.Join(questionDir, "statement.md")
+	if stmtInfo, statErr := os.Stat(stmtCandidate); statErr == nil && stmtInfo.Mode().IsRegular() {
+		if stmtBytes, readErr := os.ReadFile(stmtCandidate); readErr == nil {
+			statementPath = stmtCandidate
+			statement = string(stmtBytes)
+		}
+	}
+
 	return QuestionDetail{
-		Contest:  contest,
-		Question: question,
-		Meta:     meta,
-		Tests:    tests,
+		Contest:       contest,
+		Question:      question,
+		Meta:          meta,
+		StatementPath: statementPath,
+		Statement:     statement,
+		Tests:         tests,
 	}, nil
 }
 

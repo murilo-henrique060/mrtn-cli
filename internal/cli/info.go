@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/murilo-henrique060/mrtn-cli/internal/oracle"
+	"github.com/murilo-henrique060/mrtn-cli/internal/statement"
 )
 
 const (
@@ -29,6 +30,7 @@ type InfoOptions struct {
 	Contest    string
 	Question   string
 	TestNumber int
+	Web        bool
 }
 
 // ParseInfoArgs validates positional arguments for `mrtn info [prova] [questao] [numero-do-teste]`.
@@ -77,8 +79,28 @@ func ParseInfoArgs(args []string) (InfoOptions, error) {
 	}, nil
 }
 
+func extractInfoFlags(args []string) (posArgs []string, web bool, helpRequested bool, err error) {
+	for _, a := range args {
+		switch a {
+		case "-h", "--help":
+			return nil, false, true, nil
+		case "-w", "--web":
+			web = true
+		default:
+			if strings.HasPrefix(a, "-") {
+				return nil, false, false, &commandError{
+					err:   fmt.Errorf("flag desconhecida: %s", a),
+					usage: printInfoUsage,
+				}
+			}
+			posArgs = append(posArgs, a)
+		}
+	}
+	return posArgs, web, false, nil
+}
+
 func runInfo(args []string, stdout, _ io.Writer) error {
-	posArgs, helpRequested, err := parseSubcommandFlags("info", args, printInfoUsage)
+	posArgs, web, helpRequested, err := extractInfoFlags(args)
 	if err != nil {
 		return err
 	}
@@ -91,6 +113,7 @@ func runInfo(args []string, stdout, _ io.Writer) error {
 	if err != nil {
 		return &commandError{err: err, usage: printInfoUsage}
 	}
+	opts.Web = web
 
 	switch opts.Mode {
 	case InfoListContests:
@@ -98,7 +121,7 @@ func runInfo(args []string, stdout, _ io.Writer) error {
 	case InfoListQuestions:
 		return showQuestions(stdout, opts.Contest)
 	case InfoListTests:
-		return showTests(stdout, opts.Contest, opts.Question)
+		return showTests(stdout, opts.Contest, opts.Question, opts.Web)
 	case InfoShowTest:
 		return showTestDetail(stdout, opts.Contest, opts.Question, opts.TestNumber)
 	}
@@ -144,13 +167,31 @@ func showQuestions(stdout io.Writer, contest string) error {
 	return nil
 }
 
-func showTests(stdout io.Writer, contest, question string) error {
+func showTests(stdout io.Writer, contest, question string, openWeb bool) error {
 	detail, err := oracle.ListTests(contest, question)
 	if err != nil {
 		return err
 	}
 
 	printQuestionHeader(stdout, detail)
+
+	if strings.TrimSpace(detail.Statement) != "" {
+		fmt.Fprintln(stdout, "\n--- Enunciado ---")
+		fmt.Fprintln(stdout, statement.FormatForTerminal(detail.Statement))
+		fmt.Fprintln(stdout)
+
+		if openWeb {
+			htmlPath, webErr := statement.OpenInBrowser(detail.Contest, detail.Question, detail.Meta.Title, detail.Statement)
+			if webErr != nil {
+				fmt.Fprintf(stdout, "Aviso: HTML gerado em %s, mas não foi possível abrir o navegador automaticamente (%v)\n\n", htmlPath, webErr)
+			} else {
+				fmt.Fprintf(stdout, "Enunciado aberto no navegador com KaTeX (%s)\n\n", htmlPath)
+			}
+		}
+	} else if openWeb {
+		fmt.Fprintln(stdout, "Aviso: arquivo 'statement.md' não encontrado para esta questão.")
+	}
+
 	if len(detail.Tests) == 0 {
 		fmt.Fprintln(stdout, "Nenhum caso de teste encontrado.")
 		return nil
@@ -265,13 +306,14 @@ func pluralize(count int, singular, plural string) string {
 
 func printInfoUsage(w io.Writer) {
 	fmt.Fprint(w, `Uso:
-  mrtn info [prova] [questao] [numero-do-teste]
+  mrtn info [prova] [questao] [numero-do-teste] [--web]
 
 Descrição:
-  Inspeciona provas, questões e casos de teste sincronizados localmente:
+  Inspeciona provas, questões, enunciados e casos de teste sincronizados localmente:
     mrtn info                           Lista todas as provas disponíveis
     mrtn info <prova>                   Lista as questões da prova
-    mrtn info <prova> <questao>         Lista os testes da questão
+    mrtn info <prova> <questao>         Exibe metadados, enunciado (statement.md) e lista os testes da questão
+    mrtn info <prova> <questao> --web   Além de exibir no terminal, abre o enunciado com KaTeX no navegador
     mrtn info <prova> <questao> <num>   Exibe input, output e metadados do teste <num>
 `)
 }
