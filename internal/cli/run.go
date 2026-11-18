@@ -11,8 +11,8 @@ import (
 	"github.com/murilo-henrique060/mrtn-cli/internal/runner"
 )
 
-// TestOptions holds validated parameters for the `mrtn test` command.
-type TestOptions struct {
+// RunOptions holds validated parameters for the `mrtn run` command.
+type RunOptions struct {
 	Contest    string
 	Question   string
 	TestNumber int // 0 indicates all tests should run.
@@ -20,20 +20,20 @@ type TestOptions struct {
 	Language   Language
 }
 
-// ParseTestArgs validates positional arguments for `mrtn test <prova> <questao> [numero-do-teste] <arquivo>`.
-func ParseTestArgs(args []string) (TestOptions, error) {
+// ParseRunArgs validates positional arguments for `mrtn run <prova> <questao> [numero-do-teste] <arquivo>`.
+func ParseRunArgs(args []string) (RunOptions, error) {
 	if len(args) < 3 || len(args) > 4 {
-		return TestOptions{}, fmt.Errorf("número inválido de argumentos para 'test' (esperado 3 ou 4, recebido %d)", len(args))
+		return RunOptions{}, fmt.Errorf("número inválido de argumentos para 'run' (esperado 3 ou 4, recebido %d)", len(args))
 	}
 
 	contest, err := ParseContest(args[0])
 	if err != nil {
-		return TestOptions{}, err
+		return RunOptions{}, err
 	}
 
 	question, err := ParseQuestion(args[1])
 	if err != nil {
-		return TestOptions{}, err
+		return RunOptions{}, err
 	}
 
 	var testNumber int
@@ -43,17 +43,17 @@ func ParseTestArgs(args []string) (TestOptions, error) {
 	} else {
 		testNumber, err = ParseTestNumber(args[2])
 		if err != nil {
-			return TestOptions{}, err
+			return RunOptions{}, err
 		}
 		filePath = args[3]
 	}
 
 	lang, err := ValidateSourceFile(filePath)
 	if err != nil {
-		return TestOptions{}, err
+		return RunOptions{}, err
 	}
 
-	return TestOptions{
+	return RunOptions{
 		Contest:    contest,
 		Question:   question,
 		TestNumber: testNumber,
@@ -62,19 +62,19 @@ func ParseTestArgs(args []string) (TestOptions, error) {
 	}, nil
 }
 
-func runTest(args []string, stdout, _ io.Writer) error {
-	posArgs, helpRequested, err := parseSubcommandFlags("test", args, printTestUsage)
+func runRun(args []string, stdout, _ io.Writer) error {
+	posArgs, helpRequested, err := parseSubcommandFlags("run", args, printRunUsage)
 	if err != nil {
 		return err
 	}
 	if helpRequested {
-		printTestUsage(stdout)
+		printRunUsage(stdout)
 		return nil
 	}
 
-	opts, err := ParseTestArgs(posArgs)
+	opts, err := ParseRunArgs(posArgs)
 	if err != nil {
-		return &commandError{err: err, usage: printTestUsage}
+		return &commandError{err: err, usage: printRunUsage}
 	}
 
 	cfg := runner.RunConfig{
@@ -94,7 +94,7 @@ func runTest(args []string, stdout, _ io.Writer) error {
 			printRunHeader(stdout, detail, opts, runtimeName, timeLimit, total)
 		},
 		OnCaseDone: func(res runner.CaseResult) {
-			printCaseResult(stdout, res, detailed)
+			printCaseResult(stdout, res, opts, detailed)
 		},
 	}
 
@@ -110,7 +110,7 @@ func runTest(args []string, stdout, _ io.Writer) error {
 func printRunHeader(
 	w io.Writer,
 	detail oracle.QuestionDetail,
-	opts TestOptions,
+	opts RunOptions,
 	runtimeName string,
 	timeLimit time.Duration,
 	total int,
@@ -134,31 +134,98 @@ func printRunHeader(
 	fmt.Fprintln(w, strings.Repeat("-", 60))
 }
 
-func printCaseResult(w io.Writer, res runner.CaseResult, detailed bool) {
+func printCaseResult(w io.Writer, res runner.CaseResult, opts RunOptions, detailed bool) {
 	badge := fmt.Sprintf("[%s]", res.Verdict)
 	dur := formatDuration(res.Duration)
 
 	switch res.Verdict {
 	case runner.VerdictAC:
 		fmt.Fprintf(w, "  %-6s #%-3d %-22s (%s - Aceito)\n", badge, res.Test.Index, res.Test.Name, dur)
+
 	case runner.VerdictWA:
 		fmt.Fprintf(w, "  %-6s #%-3d %-22s (%s - Resposta incorreta)\n", badge, res.Test.Index, res.Test.Name, dur)
-		if detailed && res.Diff != "" {
-			fmt.Fprintln(w, res.Diff)
+		if !detailed {
+			return
 		}
+		if res.Input != "" {
+			fmt.Fprintln(w, "  Entrada:")
+			printIndentedBlock(w, res.Input)
+		} else if res.InputSize > 0 {
+			fmt.Fprintf(
+				w,
+				"  Entrada: (grande: %s - use 'mrtn info %s %s %d' para visualizar)\n",
+				formatSize(res.InputSize),
+				opts.Contest,
+				opts.Question,
+				res.Test.Index,
+			)
+		}
+		if res.FirstDiff != nil {
+			fmt.Fprintf(w, "  Primeira diferença (linha %d):\n", res.FirstDiff.Line)
+			fmt.Fprintln(w, res.FirstDiff.Format())
+		}
+		if res.Stderr != "" {
+			fmt.Fprintln(w, "  Prints de debug (stderr):")
+			printIndentedBlock(w, res.Stderr)
+		}
+		if tip := debugTipForLanguage(opts.Language); tip != "" {
+			fmt.Fprintf(w, "  %s\n", tip)
+		}
+
 	case runner.VerdictTLE:
 		fmt.Fprintf(w, "  %-6s #%-3d %-22s (%s - Tempo limite excedido)\n", badge, res.Test.Index, res.Test.Name, dur)
+		if !detailed {
+			return
+		}
+		if res.Stderr != "" {
+			fmt.Fprintln(w, "  Prints de debug (stderr):")
+			printIndentedBlock(w, res.Stderr)
+		}
+		if res.Stdout != "" {
+			fmt.Fprintln(w, "  Prints de debug (stdout):")
+			printIndentedBlock(w, res.Stdout)
+		}
+
 	case runner.VerdictRTE:
 		fmt.Fprintf(w, "  %-6s #%-3d %-22s (%s - Erro de execução, código=%d)\n", badge, res.Test.Index, res.Test.Name, dur, res.ExitCode)
-		if detailed && res.Stderr != "" {
-			for _, line := range strings.Split(res.Stderr, "\n") {
-				fmt.Fprintf(w, "  | %s\n", line)
-			}
+		if !detailed {
+			return
+		}
+		if res.Stderr != "" {
+			fmt.Fprintln(w, "  Mensagem de erro (stderr):")
+			printIndentedBlock(w, res.Stderr)
+		}
+		if res.Stdout != "" {
+			fmt.Fprintln(w, "  Prints de debug (stdout):")
+			printIndentedBlock(w, res.Stdout)
 		}
 	}
 }
 
-func printRunSummary(w io.Writer, opts TestOptions, report runner.RunReport) {
+func printIndentedBlock(w io.Writer, text string) {
+	for _, line := range strings.Split(text, "\n") {
+		fmt.Fprintf(w, "    | %s\n", line)
+	}
+}
+
+func debugTipForLanguage(lang Language) string {
+	switch lang {
+	case runner.LangPython:
+		return "Dica: em Python, use print(..., file=sys.stderr) para debugar sem alterar a saída padrão (stdout)."
+	case runner.LangC:
+		return "Dica: em C, use fprintf(stderr, ...) para debugar sem alterar a saída padrão (stdout)."
+	case runner.LangCPP:
+		return "Dica: em C++, use std::cerr << ... para debugar sem alterar a saída padrão (stdout)."
+	case runner.LangJava:
+		return "Dica: em Java, use System.err.println(...) para debugar sem alterar a saída padrão (stdout)."
+	case runner.LangKotlin:
+		return "Dica: em Kotlin, use System.err.println(...) para debugar sem alterar a saída padrão (stdout)."
+	default:
+		return ""
+	}
+}
+
+func printRunSummary(w io.Writer, opts RunOptions, report runner.RunReport) {
 	fmt.Fprintln(w, strings.Repeat("-", 60))
 	fmt.Fprintf(
 		w,
@@ -172,7 +239,7 @@ func printRunSummary(w io.Writer, opts TestOptions, report runner.RunReport) {
 		formatDuration(report.TotalTime),
 	)
 	if opts.TestNumber == 0 && report.Failed > 0 {
-		fmt.Fprintf(w, "Dica: execute 'mrtn test %s %s <numero> %s' para ver detalhes da falha de um teste específico.\n", opts.Contest, opts.Question, opts.FilePath)
+		fmt.Fprintf(w, "Dica: execute 'mrtn run %s %s <numero> %s' para ver detalhes da falha de um teste específico.\n", opts.Contest, opts.Question, opts.FilePath)
 	}
 }
 
@@ -183,9 +250,9 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%dms", d.Milliseconds())
 }
 
-func printTestUsage(w io.Writer) {
+func printRunUsage(w io.Writer) {
 	fmt.Fprint(w, `Uso:
-  mrtn test <prova> <questao> [numero-do-teste] <arquivo>
+  mrtn run <prova> <questao> [numero-do-teste] <arquivo>
 
 Descrição:
   Executa sua solução contra os casos de teste da questão especificada:

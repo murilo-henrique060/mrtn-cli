@@ -64,12 +64,16 @@ type RunConfig struct {
 
 // CaseResult holds the execution result of a single test case.
 type CaseResult struct {
-	Test     oracle.TestCaseSummary
-	Verdict  Verdict
-	Duration time.Duration
-	ExitCode int
-	Stderr   string
-	Diff     string
+	Test      oracle.TestCaseSummary
+	Verdict   Verdict
+	Duration  time.Duration
+	ExitCode  int
+	Input     string
+	InputSize int64
+	Stdout    string
+	Stderr    string
+	Diff      string
+	FirstDiff *DiffDetail
 }
 
 // RunReport summarizes all executed test cases.
@@ -266,6 +270,9 @@ func preparePythonProgram(
 	return preparedProgram{
 		runtimeName: runtimeName,
 		buildCmd: func(caseCtx context.Context) *exec.Cmd {
+			if cfg.TestNumber > 0 {
+				return exec.CommandContext(caseCtx, interpreter, "-B", "-u", cfg.FilePath)
+			}
 			return exec.CommandContext(caseCtx, interpreter, "-B", cfg.FilePath)
 		},
 		cleanup: func() {},
@@ -539,9 +546,9 @@ func runCompileCommand(
 		if errors.Is(compileCtx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("tempo limite de compilação excedido (%s)", compileTimeout)
 		}
-		errMsg := formatStderrSnippet(stderr.String())
+		errMsg := formatStreamSnippet(stderr.String())
 		if errMsg == "" {
-			errMsg = formatStderrSnippet(stdout.String())
+			errMsg = formatStreamSnippet(stdout.String())
 		}
 		if errMsg != "" {
 			return fmt.Errorf("erro de compilação (%s):\n%s", lang, errMsg)
@@ -588,6 +595,8 @@ func runSingleCase(
 			Test:     tc,
 			Verdict:  VerdictTLE,
 			Duration: elapsed,
+			Stdout:   formatStreamSnippet(stdout.String()),
+			Stderr:   formatStreamSnippet(stderr.String()),
 		}, nil
 	}
 
@@ -606,17 +615,23 @@ func runSingleCase(
 			Verdict:  VerdictRTE,
 			Duration: elapsed,
 			ExitCode: exitCode,
-			Stderr:   formatStderrSnippet(stderr.String()),
+			Stdout:   formatStreamSnippet(stdout.String()),
+			Stderr:   formatStreamSnippet(stderr.String()),
 		}, nil
 	}
 
-	equal, diff := CompareOutputs(string(expectedBytes), stdout.String())
+	equal, firstDiff := FirstDiff(string(expectedBytes), stdout.String())
 	if !equal {
+		_, fullDiff := CompareOutputs(string(expectedBytes), stdout.String())
 		return CaseResult{
-			Test:     tc,
-			Verdict:  VerdictWA,
-			Duration: elapsed,
-			Diff:     diff,
+			Test:      tc,
+			Verdict:   VerdictWA,
+			Duration:  elapsed,
+			Input:     readSmallInput(tc.InputPath, tc.InputSize),
+			InputSize: tc.InputSize,
+			Stderr:    formatStreamSnippet(stderr.String()),
+			Diff:      fullDiff,
+			FirstDiff: firstDiff,
 		}, nil
 	}
 
@@ -627,13 +642,40 @@ func runSingleCase(
 	}, nil
 }
 
-func formatStderrSnippet(s string) string {
+const (
+	maxInputPreviewBytes = 2048
+	maxInputPreviewLines = 25
+)
+
+func readSmallInput(path string, size int64) string {
+	if size <= 0 || size > maxInputPreviewBytes {
+		return ""
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	normalized := strings.TrimRight(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	if normalized == "" {
+		return ""
+	}
+	lines := strings.Split(normalized, "\n")
+	if len(lines) > maxInputPreviewLines {
+		return ""
+	}
+	return normalized
+}
+
+func formatStreamSnippet(s string) string {
 	trimmed := strings.TrimSpace(strings.ReplaceAll(s, "\r\n", "\n"))
 	if trimmed == "" {
 		return ""
 	}
 	const maxLines = 15
 	lines := strings.Split(trimmed, "\n")
+	for i, line := range lines {
+		lines[i] = truncateLine(line)
+	}
 	if len(lines) > maxLines {
 		lines = append(lines[:maxLines], fmt.Sprintf("... (+%d linha(s))", len(lines)-maxLines))
 	}
