@@ -102,7 +102,7 @@ Write-Host ""
 Write-Host "Próximos passos:" -ForegroundColor Cyan
 Write-Host "  1. mrtn sync     # Sincroniza os casos de teste oficiais"
 Write-Host "  2. mrtn info     # Lista as provas e questões disponíveis"
-Write-Host "  3. mrtn test     # Testa sua solução contra o juiz"
+Write-Host "  3. mrtn run      # Executa e valida sua solução contra o juiz"
 Write-Host ""
 Write-Host "Instalação concluída com sucesso! 🎈" -ForegroundColor Green
 Write-Host "(Nota: Caso o comando 'mrtn' não seja reconhecido em outros terminais abertos, basta reabri-los)." -ForegroundColor Gray

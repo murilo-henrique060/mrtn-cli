@@ -116,12 +116,12 @@ mrtn sync
 
 ---
 
-### 2. Consultar informações (`mrtn info`)
+### 2. Consultar informações e enunciado (`mrtn info`)
 
-Permite inspecionar as provas, questões e casos de teste disponíveis no cache local:
+Permite inspecionar as provas, questões, enunciados (`statement.md`) e casos de teste disponíveis no cache local:
 
 ```bash
-mrtn info [prova] [questao] [numero-do-teste]
+mrtn info [prova] [questao] [numero-do-teste] [--web]
 ```
 
 O comando adapta as informações exibidas de acordo com os parâmetros fornecidos:
@@ -138,10 +138,12 @@ O comando adapta as informações exibidas de acordo com os parâmetros fornecid
   mrtn info 2026-1
   ```
 
-* **Informando prova e questão (`mrtn info <prova> <questao>`):**  
-  Lista todos os casos de teste disponíveis para a questão (amostras e testes fechados), numerados sequencialmente a partir de `1`.
+* **Informando prova e questão (`mrtn info <prova> <questao> [--web]`):**  
+  Exibe os metadados da questão, o **enunciado completo** (a partir do arquivo `statement.md`, com fórmulas matemáticas LaTeX convertidas automaticamente para Unicode legível no terminal) e, logo abaixo, lista todos os casos de teste disponíveis numerados sequencialmente a partir de `1`.  
+  Se a flag `--web` (ou `-w`) for informada, o `mrtn` também abre o enunciado renderizado com **KaTeX** no seu navegador padrão.
   ```bash
   mrtn info 2026-1 A
+  mrtn info 2026-1 A --web
   ```
 
 * **Informando prova, questão e número do teste (`mrtn info <prova> <questao> <numero-do-teste>`):**  
@@ -151,31 +153,35 @@ O comando adapta as informações exibidas de acordo com os parâmetros fornecid
   mrtn info 2026-1 A 1
   ```
 
-### 3. Executar testes (`mrtn test`)
+### 3. Executar solução (`mrtn run`)
 
 Executa o seu código contra os casos de teste da questão especificada, informando a prova e a questão (*case-insensitive*, ex: `2026-1 a` ou `2026-1 A`):
 
 ```bash
-mrtn test <prova> <questao> [numero-do-teste] <arquivo>
+mrtn run <prova> <questao> [numero-do-teste] <arquivo>
 ```
 
-> **Nota sobre `[numero-do-teste]`:** Assim como no `mrtn info`, apenas o índice numérico do teste (começando em `1`, seguindo a ordem listada no `info`) é aceito pelo programa (ex: use `1` ao invés de `sample001`).
+> **Nota sobre `[numero-do-teste]`:** Ao informar o número de um teste específico (começando em `1`), o `mrtn run` exibe um diagnóstico focado para cada tipo de resultado:
+> - **`AC` (Aceito):** Exibe apenas a linha de confirmação.
+> - **`WA` (Resposta incorreta):** Exibe a entrada (caso não seja gigante), apenas a primeira linha de diferença entre o esperado e o obtido, eventuais prints de debug (`stderr`) e uma dica de depuração específica para a linguagem utilizada.
+> - **`RTE` (Erro de execução):** Exibe a mensagem de erro (`stderr`) e os prints de debug (`stdout`) produzidos antes da falha.
+> - **`TLE` (Tempo limite excedido):** Exibe os prints de debug capturados antes do estouro de tempo.
 
 #### Exemplos de uso:
 
-* **Testar todos os casos da questão `A` da prova `2026-1`:**
+* **Rodar todos os casos da questão `A` da prova `2026-1`:**
   ```bash
-  mrtn test 2026-1 A solucao.cpp
+  mrtn run 2026-1 A solucao.cpp
   ```
 
-* **Testar apenas um caso de teste específico (ex: caso `3` da questão `B` de `2026-1`, aceitando minúsculas):**
+* **Rodar apenas um caso de teste específico para depuração (ex: caso `3` da questão `B` de `2026-1`):**
   ```bash
-  mrtn test 2026-1 b 3 solucao.py
+  mrtn run 2026-1 b 3 solucao.py
   ```
 
-* **Testar solução em Python para a questão `M` de `2026-1`:**
+* **Rodar solução em Python para a questão `M` de `2026-1`:**
   ```bash
-  mrtn test 2026-1 m solucao.py
+  mrtn run 2026-1 m solucao.py
   ```
 
 
@@ -188,6 +194,31 @@ mrtn clear
 ```
 
 > **Nota:** Após a limpeza, você pode baixar os casos de teste novamente a qualquer momento executando `mrtn sync`.
+
+
+### 5. Atualizar a ferramenta (`mrtn update`)
+
+Baixa e instala automaticamente a versão mais recente do `mrtn` a partir das releases do GitHub, substituindo o binário atual:
+
+```bash
+mrtn update
+```
+
+Você também pode especificar uma versão alvo ou forçar a reinstalação:
+
+```bash
+mrtn update v1.0.2
+mrtn update --force
+```
+
+
+### 6. Desinstalar completamente (`mrtn remove`)
+
+Remove todos os arquivos associados ao `mrtn` do sistema — incluindo casos de teste sincronizados, diretórios de dados locais, caches temporários de enunciados e o próprio executável do `mrtn`:
+
+```bash
+mrtn remove
+```
 
 
 ## Suporte a Linguagens
