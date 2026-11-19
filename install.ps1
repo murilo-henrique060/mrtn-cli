@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Instalador automatizado do mrtn para Windows (PowerShell)
     https://github.com/murilo-henrique060/mrtn-cli
