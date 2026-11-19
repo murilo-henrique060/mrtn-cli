@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Instalador automatizado do mrtn para Windows (PowerShell)
     https://github.com/murilo-henrique060/mrtn-cli
@@ -6,7 +6,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$Version = "v1.0.1",
+    [string]$Version = "v1.1.0",
     [string]$InstallDir = ""
 )
 

@@ -6,7 +6,7 @@
 set -euo pipefail
 
 REPO="murilo-henrique060/mrtn-cli"
-DEFAULT_VERSION="v1.0.1"
+DEFAULT_VERSION="v1.1.0"
 VERSION="${MRTN_VERSION:-$DEFAULT_VERSION}"
 
 echo "============================================================"

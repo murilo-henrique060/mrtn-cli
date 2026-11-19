@@ -11,7 +11,7 @@ import (
 )
 
 // Version holds the CLI version, injected via -ldflags or resolved from Go build info.
-var Version = "v1.0.1"
+var Version = "v1.1.0"
 
 type commandError struct {
 	err   error

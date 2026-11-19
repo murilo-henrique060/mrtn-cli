@@ -40,30 +40,30 @@ go install github.com/murilo-henrique060/mrtn-cli/cmd/mrtn@latest
 
 ### 3. Via binários pré-compilados manuais
 
-Baixe o executável correspondente ao seu sistema operacional na página de [Releases](https://github.com/murilo-henrique060/mrtn-cli/releases/tag/v1.0.1):
+Baixe o executável correspondente ao seu sistema operacional na página de [Releases](https://github.com/murilo-henrique060/mrtn-cli/releases/tag/v1.1.0):
 
-| Sistema | Arquitetura | Pacote (`v1.0.1`) |
+| Sistema | Arquitetura | Pacote (`v1.1.0`) |
 | :--- | :--- | :--- |
-| **Linux** | x86_64 (`amd64`) | `mrtn-v1.0.1-linux-amd64` |
-| **Linux** | ARM64 (`arm64`) | `mrtn-v1.0.1-linux-arm64` |
-| **Windows** | x86_64 (`amd64`) | `mrtn-v1.0.1-windows-amd64.exe` |
-| **Windows** | ARM64 (`arm64`) | `mrtn-v1.0.1-windows-arm64.exe` |
-| **macOS** | Intel (`amd64`) | `mrtn-v1.0.1-darwin-amd64` |
-| **macOS** | Apple Silicon (`arm64`) | `mrtn-v1.0.1-darwin-arm64` |
+| **Linux** | x86_64 (`amd64`) | `mrtn-v1.1.0-linux-amd64` |
+| **Linux** | ARM64 (`arm64`) | `mrtn-v1.1.0-linux-arm64` |
+| **Windows** | x86_64 (`amd64`) | `mrtn-v1.1.0-windows-amd64.exe` |
+| **Windows** | ARM64 (`arm64`) | `mrtn-v1.1.0-windows-arm64.exe` |
+| **macOS** | Intel (`amd64`) | `mrtn-v1.1.0-darwin-amd64` |
+| **macOS** | Apple Silicon (`arm64`) | `mrtn-v1.1.0-darwin-arm64` |
 
 #### Linux
 ```bash
-curl -LO https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.1/mrtn-v1.0.1-linux-amd64
-chmod +x mrtn-v1.0.1-linux-amd64
-sudo mv mrtn-v1.0.1-linux-amd64 /usr/local/bin/mrtn
+curl -LO https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.1.0/mrtn-v1.1.0-linux-amd64
+chmod +x mrtn-v1.1.0-linux-amd64
+sudo mv mrtn-v1.1.0-linux-amd64 /usr/local/bin/mrtn
 mrtn --version
 ```
 
 #### macOS
 ```bash
-curl -LO https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.1/mrtn-v1.0.1-darwin-arm64
-chmod +x mrtn-v1.0.1-darwin-arm64
-sudo mv mrtn-v1.0.1-darwin-arm64 /usr/local/bin/mrtn
+curl -LO https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.1.0/mrtn-v1.1.0-darwin-arm64
+chmod +x mrtn-v1.1.0-darwin-arm64
+sudo mv mrtn-v1.1.0-darwin-arm64 /usr/local/bin/mrtn
 mrtn --version
 ```
 
@@ -71,7 +71,7 @@ mrtn --version
 ```powershell
 New-Item -ItemType Directory -Force -Path "$env:LOCALAPPDATA\Programs\mrtn" | Out-Null
 Invoke-WebRequest `
-  -Uri "https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.0.1/mrtn-v1.0.1-windows-amd64.exe" `
+  -Uri "https://github.com/murilo-henrique060/mrtn-cli/releases/download/v1.1.0/mrtn-v1.1.0-windows-amd64.exe" `
   -OutFile "$env:LOCALAPPDATA\Programs\mrtn\mrtn.exe"
 
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
