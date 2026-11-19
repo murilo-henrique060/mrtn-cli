@@ -155,6 +155,24 @@ O comando adapta as informações exibidas de acordo com os parâmetros fornecid
 
 ### 3. Executar solução (`mrtn run`)
 
+O `mrtn run` suporta dois modos de execução:
+
+#### Modo Manual (Interativo)
+
+Executa o seu código diretamente, conectando a entrada (`stdin`) e saída (`stdout`) ao terminal. Permite digitar ou colar entradas customizadas para testar o código rapidamente sem precisar voltar ao método tradicional de compilar ou invocar interpretadores manualmente:
+
+```bash
+mrtn run <arquivo>
+```
+
+Exemplo:
+```bash
+mrtn run solucao.py
+mrtn run solucao.cpp
+```
+
+#### Modo Oráculo (Testes Oficiais)
+
 Executa o seu código contra os casos de teste da questão especificada, informando a prova e a questão (*case-insensitive*, ex: `2026-1 a` ou `2026-1 A`):
 
 ```bash
@@ -168,6 +186,11 @@ mrtn run <prova> <questao> [numero-do-teste] <arquivo>
 > - **`TLE` (Tempo limite excedido):** Exibe os prints de debug capturados antes do estouro de tempo.
 
 #### Exemplos de uso:
+
+* **Rodar de forma interativa com suas próprias entradas:**
+  ```bash
+  mrtn run solucao.py
+  ```
 
 * **Rodar todos os casos da questão `A` da prova `2026-1`:**
   ```bash

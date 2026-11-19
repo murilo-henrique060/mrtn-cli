@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -58,6 +59,7 @@ type RunConfig struct {
 	TestNumber        int // 0 runs all tests; >= 1 runs only that 1-based index.
 	FilePath          string
 	Language          Language
+	IsManual          bool
 	TimeLimitOverride time.Duration
 	LookPath          func(string) (string, error)
 }
@@ -90,9 +92,10 @@ type RunReport struct {
 
 // RunHooks provides optional progress callbacks during compilation and test execution.
 type RunHooks struct {
-	OnCompileStart func(filePath string, lang Language, compiler string)
-	OnStart        func(detail oracle.QuestionDetail, runtimeName string, timeLimit time.Duration, total int)
-	OnCaseDone     func(CaseResult)
+	OnCompileStart     func(filePath string, lang Language, compiler string)
+	OnStart            func(detail oracle.QuestionDetail, runtimeName string, timeLimit time.Duration, total int)
+	OnCaseDone         func(CaseResult)
+	OnInteractiveStart func(filePath string, lang Language, runtimeName string)
 }
 
 type preparedProgram struct {
@@ -195,6 +198,54 @@ func ExecuteTests(ctx context.Context, cfg RunConfig, hooks RunHooks) (RunReport
 	return report, nil
 }
 
+// ExecuteInteractive compiles/prepares the solution if needed and runs it interactively,
+// connecting standard input, output, and error directly to the terminal or provided streams.
+func ExecuteInteractive(
+	ctx context.Context,
+	cfg RunConfig,
+	hooks RunHooks,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+) error {
+	program, err := prepareProgram(ctx, cfg, oracle.ProblemLimits{}, hooks)
+	if err != nil {
+		return err
+	}
+	defer program.cleanup()
+
+	if hooks.OnInteractiveStart != nil {
+		hooks.OnInteractiveStart(cfg.FilePath, cfg.Language, program.runtimeName)
+	}
+
+	cmd := program.buildCmd(ctx)
+	if stdin == nil {
+		cmd.Stdin = os.Stdin
+	} else {
+		cmd.Stdin = stdin
+	}
+	if stdout == nil {
+		cmd.Stdout = os.Stdout
+	} else {
+		cmd.Stdout = stdout
+	}
+	if stderr == nil {
+		cmd.Stderr = os.Stderr
+	} else {
+		cmd.Stderr = stderr
+	}
+
+	runErr := cmd.Run()
+	if runErr != nil {
+		var exitErr *exec.ExitError
+		if errors.As(runErr, &exitErr) {
+			return fmt.Errorf("programa finalizado com erro (código=%d)", exitErr.ExitCode())
+		}
+		return runErr
+	}
+
+	return nil
+}
+
 func prepareProgram(
 	ctx context.Context,
 	cfg RunConfig,
@@ -270,7 +321,7 @@ func preparePythonProgram(
 	return preparedProgram{
 		runtimeName: runtimeName,
 		buildCmd: func(caseCtx context.Context) *exec.Cmd {
-			if cfg.TestNumber > 0 {
+			if cfg.TestNumber > 0 || cfg.IsManual {
 				return exec.CommandContext(caseCtx, interpreter, "-B", "-u", cfg.FilePath)
 			}
 			return exec.CommandContext(caseCtx, interpreter, "-B", cfg.FilePath)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -18,12 +19,28 @@ type RunOptions struct {
 	TestNumber int // 0 indicates all tests should run.
 	FilePath   string
 	Language   Language
+	IsManual   bool
 }
 
-// ParseRunArgs validates positional arguments for `mrtn run <prova> <questao> [numero-do-teste] <arquivo>`.
+// ParseRunArgs validates positional arguments for:
+// 1) mrtn run <arquivo> (manual/interactive execution)
+// 2) mrtn run <prova> <questao> [numero-do-teste] <arquivo> (oracle tests)
 func ParseRunArgs(args []string) (RunOptions, error) {
+	if len(args) == 1 {
+		filePath := args[0]
+		lang, err := ValidateSourceFile(filePath)
+		if err != nil {
+			return RunOptions{}, err
+		}
+		return RunOptions{
+			FilePath: filePath,
+			Language: lang,
+			IsManual: true,
+		}, nil
+	}
+
 	if len(args) < 3 || len(args) > 4 {
-		return RunOptions{}, fmt.Errorf("número inválido de argumentos para 'run' (esperado 3 ou 4, recebido %d)", len(args))
+		return RunOptions{}, fmt.Errorf("número inválido de argumentos para 'run' (esperado 1 argumento '<arquivo>', ou 3 a 4 argumentos '<prova> <questao> [numero-do-teste] <arquivo>')")
 	}
 
 	contest, err := ParseContest(args[0])
@@ -59,10 +76,11 @@ func ParseRunArgs(args []string) (RunOptions, error) {
 		TestNumber: testNumber,
 		FilePath:   filePath,
 		Language:   lang,
+		IsManual:   false,
 	}, nil
 }
 
-func runRun(args []string, stdout, _ io.Writer) error {
+func runRun(args []string, stdout, stderr io.Writer) error {
 	posArgs, helpRequested, err := parseSubcommandFlags("run", args, printRunUsage)
 	if err != nil {
 		return err
@@ -83,6 +101,16 @@ func runRun(args []string, stdout, _ io.Writer) error {
 		TestNumber: opts.TestNumber,
 		FilePath:   opts.FilePath,
 		Language:   opts.Language,
+		IsManual:   opts.IsManual,
+	}
+
+	if opts.IsManual {
+		hooks := runner.RunHooks{
+			OnCompileStart: func(filePath string, lang runner.Language, compiler string) {
+				fmt.Fprintf(stdout, "Compilando %s (%s via %s)...\n", filePath, lang, compiler)
+			},
+		}
+		return runner.ExecuteInteractive(context.Background(), cfg, hooks, os.Stdin, stdout, stderr)
 	}
 
 	detailed := opts.TestNumber > 0
@@ -252,13 +280,22 @@ func formatDuration(d time.Duration) string {
 
 func printRunUsage(w io.Writer) {
 	fmt.Fprint(w, `Uso:
+  mrtn run <arquivo>
   mrtn run <prova> <questao> [numero-do-teste] <arquivo>
 
 Descrição:
-  Executa sua solução contra os casos de teste da questão especificada:
-    <prova>             Identificador da prova (ex: 2026-1)
-    <questao>           Identificador da questão, case-insensitive (ex: a ou A)
-    [numero-do-teste]   Índice numérico do teste a partir de 1 (opcional)
-    <arquivo>           Caminho para o arquivo-fonte (.py, .c, .cpp, .cc, .cxx, .java, .kt)
+  Executa sua solução em dois modos:
+    1. Modo manual (interativo):
+       mrtn run <arquivo>
+       Executa o código diretamente lendo do terminal (stdin) e exibindo a saída (stdout).
+       Permite testar entradas customizadas sem precisar voltar ao método tradicional.
+
+    2. Modo oráculo (testes oficiais):
+       mrtn run <prova> <questao> [numero-do-teste] <arquivo>
+       Executa sua solução contra os casos de teste da questão especificada no oráculo.
+       <prova>             Identificador da prova (ex: 2026-1)
+       <questao>           Identificador da questão, case-insensitive (ex: a ou A)
+       [numero-do-teste]   Índice numérico do teste a partir de 1 (opcional)
+       <arquivo>           Caminho para o arquivo-fonte (.py, .c, .cpp, .cc, .cxx, .java, .kt)
 `)
 }
